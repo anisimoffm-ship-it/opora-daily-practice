@@ -27,6 +27,7 @@ type RitualStep =
   | "check-in"
   | "guide"
   | "practice"
+  | "apply"
   | "reflect"
   | "support"
   | "complete";
@@ -34,9 +35,9 @@ type RitualStep =
 type RitualOutcomeId = "clearer" | "space" | "next-step" | "same" | "heavier";
 
 const RITUAL_OUTCOMES: Array<{ id: RitualOutcomeId; label: string }> = [
-  { id: "clearer", label: "Стало чуть яснее" },
+  { id: "clearer", label: "Ситуация стала чуть яснее" },
   { id: "space", label: "Появилось немного пространства" },
-  { id: "next-step", label: "Обозначился следующий шаг" },
+  { id: "next-step", label: "Понятнее, что делать дальше" },
   { id: "same", label: "Ничего не изменилось" },
   { id: "heavier", label: "Стало заметно тяжелее" },
 ];
@@ -46,6 +47,8 @@ export function DailyRitual() {
   const [selectedStateId, setSelectedStateId] = useState<RitualStateId>();
   const [answer, setAnswer] = useState("");
   const [answeredMentally, setAnsweredMentally] = useState(false);
+  const [applicationAnswer, setApplicationAnswer] = useState("");
+  const [applicationAnsweredMentally, setApplicationAnsweredMentally] = useState(false);
   const [outcome, setOutcome] = useState<RitualOutcomeId>();
   const [completions, setCompletions] = useState<RitualCompletion[]>([]);
 
@@ -86,7 +89,8 @@ export function DailyRitual() {
       if (current === "check-in") return "settling";
       if (current === "guide") return "check-in";
       if (current === "practice") return "guide";
-      if (current === "reflect") return "practice";
+      if (current === "apply") return "practice";
+      if (current === "reflect") return "apply";
       if (current === "support") return "reflect";
       return "home";
     });
@@ -119,6 +123,8 @@ export function DailyRitual() {
     setSelectedStateId(undefined);
     setAnswer("");
     setAnsweredMentally(false);
+    setApplicationAnswer("");
+    setApplicationAnsweredMentally(false);
     setOutcome(undefined);
     setStep("settling");
   };
@@ -138,7 +144,16 @@ export function DailyRitual() {
     return (
       <CheckInScreen
         selectedStateId={selectedStateId}
-        onSelect={setSelectedStateId}
+        onSelect={(stateId) => {
+          if (stateId !== selectedStateId) {
+            setAnswer("");
+            setAnsweredMentally(false);
+            setApplicationAnswer("");
+            setApplicationAnsweredMentally(false);
+            setOutcome(undefined);
+          }
+          setSelectedStateId(stateId);
+        }}
         onBack={goBack}
         onContinue={() => setStep("guide")}
       />
@@ -164,6 +179,21 @@ export function DailyRitual() {
         onAnswerChange={setAnswer}
         onAnsweredMentallyChange={setAnsweredMentally}
         onBack={goBack}
+        onContinue={() => setStep("apply")}
+      />
+    );
+  }
+
+  if (step === "apply" && selectedSkill) {
+    return (
+      <ApplicationScreen
+        skill={selectedSkill}
+        answer={answer}
+        applicationAnswer={applicationAnswer}
+        answeredMentally={applicationAnsweredMentally}
+        onApplicationAnswerChange={setApplicationAnswer}
+        onAnsweredMentallyChange={setApplicationAnsweredMentally}
+        onBack={goBack}
         onContinue={() => setStep("reflect")}
       />
     );
@@ -173,6 +203,7 @@ export function DailyRitual() {
     return (
       <ReflectionScreen
         answer={answer}
+        applicationAnswer={applicationAnswer}
         outcome={outcome}
         onOutcomeChange={setOutcome}
         onBack={goBack}
@@ -185,6 +216,7 @@ export function DailyRitual() {
     return (
       <SupportScreen
         skill={selectedSkill}
+        applicationAnswer={applicationAnswer}
         outcome={outcome}
         onBack={goBack}
         onComplete={finishRitual}
@@ -271,7 +303,7 @@ function HomeScreen({
           Начать с паузы
         </Button>
         <p className="text-center text-sm leading-relaxed text-muted-foreground">
-          Около минуты. Можно остановиться в любой момент.
+          Около двух минут. Можно остановиться в любой момент.
         </p>
       </section>
     </div>
@@ -458,7 +490,96 @@ function PracticeScreen({
       </label>
 
       <Button type="submit" size="lg" className="h-12 w-full" disabled={!canContinue}>
-        Увидеть свой ответ
+        Я ответил. Что дальше?
+      </Button>
+    </form>
+  );
+}
+
+function ApplicationScreen({
+  skill,
+  answer,
+  applicationAnswer,
+  answeredMentally,
+  onApplicationAnswerChange,
+  onAnsweredMentallyChange,
+  onBack,
+  onContinue,
+}: {
+  skill: RitualSkill;
+  answer: string;
+  applicationAnswer: string;
+  answeredMentally: boolean;
+  onApplicationAnswerChange: (answer: string) => void;
+  onAnsweredMentallyChange: (answered: boolean) => void;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  const canContinue = Boolean(applicationAnswer.trim() || answeredMentally);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (canContinue) onContinue();
+  };
+
+  return (
+    <form onSubmit={submit} className="ritual-screen-enter space-y-6 pb-8">
+      <BackButton onClick={onBack} />
+
+      <section className="space-y-2 border-l-2 border-primary/35 pl-4">
+        <p className="text-sm text-muted-foreground">Что ты заметил</p>
+        <p className="text-base font-medium leading-relaxed">
+          {answer.trim() || "Первый ответ был про себя."}
+        </p>
+      </section>
+
+      <section className="space-y-3">
+        <p className="text-sm text-muted-foreground">Теперь — что с этим делать</p>
+        <label
+          htmlFor={skill.application.id}
+          className="block text-3xl font-medium leading-tight tracking-tight outline-none"
+          data-ritual-heading
+          tabIndex={-1}
+        >
+          {skill.application.label}
+        </label>
+        <p
+          id={`${skill.application.id}-guidance`}
+          className="text-sm leading-relaxed text-muted-foreground"
+        >
+          {skill.application.guidance}
+        </p>
+      </section>
+
+      <Textarea
+        id={skill.application.id}
+        name={skill.application.id}
+        value={applicationAnswer}
+        onChange={(event) => onApplicationAnswerChange(event.target.value)}
+        placeholder={skill.application.placeholder}
+        aria-describedby={`${skill.application.id}-guidance ${skill.application.id}-privacy`}
+        className="min-h-32 resize-none bg-base-200/55 px-4 py-3"
+      />
+
+      <p
+        id={`${skill.application.id}-privacy`}
+        className="text-sm leading-relaxed text-muted-foreground"
+      >
+        Запиши одну фразу или выбери вариант про себя. «Пока не знаю» тоже подходит. Этот текст не сохранится.
+      </p>
+
+      <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-box border border-border bg-secondary/45 px-4 py-3 text-sm font-medium focus-within:ring-3 focus-within:ring-ring">
+        <input
+          type="checkbox"
+          name="application-answered-mentally"
+          className="checkbox checkbox-sm"
+          checked={answeredMentally}
+          onChange={(event) => onAnsweredMentallyChange(event.target.checked)}
+        />
+        Я выбрал вариант про себя
+      </label>
+
+      <Button type="submit" size="lg" className="h-12 w-full" disabled={!canContinue}>
+        Увидеть оба ответа
       </Button>
     </form>
   );
@@ -466,12 +587,14 @@ function PracticeScreen({
 
 function ReflectionScreen({
   answer,
+  applicationAnswer,
   outcome,
   onOutcomeChange,
   onBack,
   onContinue,
 }: {
   answer: string;
+  applicationAnswer: string;
   outcome?: RitualOutcomeId;
   onOutcomeChange: (outcome: RitualOutcomeId) => void;
   onBack: () => void;
@@ -486,12 +609,25 @@ function ReflectionScreen({
     <form onSubmit={submit} className="ritual-screen-enter space-y-7 pb-8">
       <BackButton onClick={onBack} />
 
-      <section className="space-y-3 border-l-2 border-primary/40 pl-4">
-        <p className="text-sm text-muted-foreground">{answer.trim() ? "Твои слова" : "Ответ был про себя"}</p>
-        <p className="text-xl font-medium leading-relaxed">
-          {answer.trim() || "Не нужно подбирать правильную фразу или записывать её для приложения."}
-        </p>
-      </section>
+      <div className="space-y-4">
+        <section className="space-y-2 border-l-2 border-primary/35 pl-4">
+          <p className="text-sm text-muted-foreground">
+            {answer.trim() ? "Что ты заметил" : "Первый ответ был про себя"}
+          </p>
+          <p className="text-base font-medium leading-relaxed">
+            {answer.trim() || "Не нужно подбирать правильную фразу или записывать её для приложения."}
+          </p>
+        </section>
+
+        <section className="space-y-2 rounded-box bg-secondary/55 p-4">
+          <p className="text-sm text-muted-foreground">
+            {applicationAnswer.trim() ? "Что делать дальше" : "Следующий вариант выбран про себя"}
+          </p>
+          <p className="text-xl font-medium leading-relaxed">
+            {applicationAnswer.trim() || "Необязательно записывать его для приложения."}
+          </p>
+        </section>
+      </div>
 
       <fieldset className="space-y-4">
         <legend
@@ -499,10 +635,10 @@ function ReflectionScreen({
           data-ritual-heading
           tabIndex={-1}
         >
-          Что изменилось?
+          Что ты замечаешь сейчас?
         </legend>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Любой ответ подходит. Это не оценка практики.
+          Не нужно, чтобы стало легче. Отметь, что сейчас ближе всего.
         </p>
         <div className="grid gap-2" role="radiogroup">
           {RITUAL_OUTCOMES.map((option) => (
@@ -533,11 +669,13 @@ function ReflectionScreen({
 
 function SupportScreen({
   skill,
+  applicationAnswer,
   outcome,
   onBack,
   onComplete,
 }: {
   skill: RitualSkill;
+  applicationAnswer: string;
   outcome: RitualOutcomeId;
   onBack: () => void;
   onComplete: () => void;
@@ -564,10 +702,19 @@ function SupportScreen({
         </section>
 
         {!isHeavier && (
-          <section className="space-y-2 border-l-2 border-primary/35 pl-4">
-            <h2 className="text-sm font-medium">В реальной жизни</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">{skill.nextStep}</p>
-          </section>
+          <div className="space-y-4">
+            <section className="space-y-2 rounded-box bg-secondary/55 p-4">
+              <h2 className="text-sm font-medium">Твой следующий шаг</h2>
+              <p className="text-base leading-relaxed">
+                {applicationAnswer.trim() || "Шаг был выбран про себя."}
+              </p>
+            </section>
+
+            <section className="space-y-2 border-l-2 border-primary/35 pl-4">
+              <h2 className="text-sm font-medium">Ориентир</h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">{skill.nextStep}</p>
+            </section>
+          </div>
         )}
       </div>
 
