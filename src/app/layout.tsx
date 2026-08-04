@@ -1,10 +1,16 @@
 import type { Metadata, Viewport } from "next";
+import { Geist } from "next/font/google";
 import { AppShell } from "@/components/layout/app-shell";
 import "./globals.css";
 
+const geist = Geist({
+  subsets: ["cyrillic", "latin"],
+  variable: "--font-geist",
+});
+
 export const metadata: Metadata = {
-  title: "Опора — тренировка внутренней опоры",
-  description: "Две спокойные минуты в день, чтобы укреплять внутреннюю опору.",
+  title: "Опора | Короткий ежедневный ритуал",
+  description: "Одна спокойная практика, которая помогает заметить происходящее и найти собственные слова.",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -17,7 +23,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2F7D68",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#2F7D68" },
+    { media: "(prefers-color-scheme: dark)", color: "#18211F" },
+  ],
 };
 
 export default function RootLayout({
@@ -26,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" className="h-full antialiased">
+    <html lang="ru" className={`${geist.variable} h-full antialiased`}>
       <body className="min-h-full bg-background text-foreground">
         <AppShell>{children}</AppShell>
       </body>

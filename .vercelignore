@@ -1,0 +1,6 @@
+android/
+artifacts/
+ios/
+src-tauri/
+.next/
+out/

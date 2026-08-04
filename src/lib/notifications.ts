@@ -1,3 +1,5 @@
+import { Capacitor, type PermissionState } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadJson, saveJson } from "./browser-storage";
 import { getRitualCompletions } from "./daily-ritual";
 
@@ -38,6 +40,12 @@ interface NotificationContext {
 export const NOTIFICATION_SETTINGS_CHANGED = "notificationSettingsChanged";
 export const NOTIFICATION_SETTINGS_KEY = "notificationSettings";
 const NOTIFICATION_HISTORY_KEY = "notificationHistory";
+const NATIVE_MORNING_NOTIFICATION_ID = 31001;
+const NATIVE_EVENING_NOTIFICATION_ID = 31002;
+const NATIVE_PREVIEW_NOTIFICATION_ID = 31003;
+const NATIVE_IMMEDIATE_MORNING_NOTIFICATION_ID = 31004;
+const NATIVE_IMMEDIATE_EVENING_NOTIFICATION_ID = 31005;
+const ANDROID_REMINDER_CHANNEL_ID = "opora-reminders";
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   enabled: false,
@@ -144,7 +152,7 @@ const PRACTICAL_MESSAGES: Omit<NotificationMessage, "id" | "style">[] = [
   { slot: "morning", title: "Меньше нагрузки", body: "Выбери, что сегодня можно сделать на 10% проще.", themes: ["Стресс", "Выгорание"] },
   { slot: "morning", title: "Фраза вместо критики", body: "Заметь строгий голос и ответь себе спокойнее.", themes: ["Самокритика"] },
   { slot: "morning", title: "Следующее действие", body: "Назови один шаг, который займет не больше двух минут.", energies: ["низкая"] },
-  { slot: "morning", title: "Тема дня", body: "Навык дня уже выбран. Осталось уделить себе две минуты.", recency: "recent" },
+  { slot: "morning", title: "Короткая практика", body: "Один вопрос поможет выбрать практику на сейчас.", recency: "recent" },
   { slot: "morning", title: "Что нужно сейчас?", body: "Что сейчас нужнее: покой, ясность, контакт или движение?", themes: ["Эмоции", "Отношения"] },
   { slot: "morning", title: "Ценность в действии", body: "Выбери маленькое действие, которое поддержит важное для тебя.", themes: ["Ценности"] },
   { slot: "morning", title: "Точка уверенности", body: "Найди один факт, который подтверждает твою способность справляться.", themes: ["Уверенность", "Самооценка"] },
@@ -184,12 +192,34 @@ export function saveNotificationSettings(settings: NotificationSettings): void {
   }
 }
 
-export function getNotificationPermission(): NotificationPermission | "unsupported" {
+export function usesNativeNotifications(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+export async function getNotificationPermission(): Promise<NotificationPermission | "unsupported"> {
+  if (usesNativeNotifications()) {
+    try {
+      const { display } = await LocalNotifications.checkPermissions();
+      return mapNativePermission(display);
+    } catch {
+      return "unsupported";
+    }
+  }
+
   if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
   return Notification.permission;
 }
 
 export async function requestNotificationPermission(): Promise<NotificationPermission | "unsupported"> {
+  if (usesNativeNotifications()) {
+    try {
+      const { display } = await LocalNotifications.requestPermissions();
+      return mapNativePermission(display);
+    } catch {
+      return "unsupported";
+    }
+  }
+
   if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
   return Notification.requestPermission();
 }
@@ -220,9 +250,29 @@ export function getStylePreviewMessage(style: NotificationStyle): NotificationMe
 
 export async function showConfiguredNotification(slot: NotificationSlot): Promise<boolean> {
   const settings = getNotificationSettings();
-  if (!settings.enabled || getNotificationPermission() !== "granted") return false;
+  if (!settings.enabled || await getNotificationPermission() !== "granted") return false;
 
   const message = selectNotificationMessage(settings.style, slot);
+  if (usesNativeNotifications()) {
+    await ensureAndroidReminderChannel();
+    await LocalNotifications.schedule({
+      notifications: [{
+        id: slot === "morning"
+          ? NATIVE_IMMEDIATE_MORNING_NOTIFICATION_ID
+          : NATIVE_IMMEDIATE_EVENING_NOTIFICATION_ID,
+        title: message.title,
+        body: message.body,
+        largeBody: message.body,
+        channelId: ANDROID_REMINDER_CHANNEL_ID,
+        schedule: { at: new Date(Date.now() + 500) },
+        extra: { url: "/", slot },
+        autoCancel: true,
+      }],
+    });
+    rememberNotification(message.id, slot);
+    return true;
+  }
+
   const options: NotificationOptions = {
     body: message.body,
     icon: "/icon-192.png",
@@ -248,10 +298,29 @@ export async function showConfiguredNotification(slot: NotificationSlot): Promis
 }
 
 export async function showPreviewNotification(style: NotificationStyle): Promise<boolean> {
-  const permission = getNotificationPermission();
+  const permission = await getNotificationPermission();
   if (permission !== "granted") return false;
   const slot = getCurrentNotificationSlot();
   const message = selectNotificationMessage(style, slot);
+
+  if (usesNativeNotifications()) {
+    await ensureAndroidReminderChannel();
+    await LocalNotifications.schedule({
+      notifications: [{
+        id: NATIVE_PREVIEW_NOTIFICATION_ID,
+        title: message.title,
+        body: message.body,
+        largeBody: message.body,
+        channelId: ANDROID_REMINDER_CHANNEL_ID,
+        schedule: { at: new Date(Date.now() + 500) },
+        extra: { url: "/notifications/", slot },
+        autoCancel: true,
+      }],
+    });
+    rememberNotification(message.id, slot);
+    return true;
+  }
+
   const options: NotificationOptions = {
     body: message.body,
     icon: "/icon-192.png",
@@ -272,6 +341,53 @@ export async function showPreviewNotification(style: NotificationStyle): Promise
   return true;
 }
 
+export async function syncNativeNotificationSchedule(
+  settings = getNotificationSettings(),
+): Promise<void> {
+  if (!usesNativeNotifications()) return;
+
+  await LocalNotifications.cancel({
+    notifications: [
+      { id: NATIVE_MORNING_NOTIFICATION_ID },
+      { id: NATIVE_EVENING_NOTIFICATION_ID },
+    ],
+  });
+
+  if (!settings.enabled || await getNotificationPermission() !== "granted") return;
+
+  await ensureAndroidReminderChannel();
+
+  const morningMessage = selectNotificationMessage(settings.style, "morning");
+  const eveningMessage = selectNotificationMessage(settings.style, "evening");
+  const [morningHour, morningMinute] = parseTime(settings.morningTime);
+  const [eveningHour, eveningMinute] = parseTime(settings.eveningTime);
+
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: NATIVE_MORNING_NOTIFICATION_ID,
+        title: morningMessage.title,
+        body: morningMessage.body,
+        largeBody: morningMessage.body,
+        channelId: ANDROID_REMINDER_CHANNEL_ID,
+        schedule: { on: { hour: morningHour, minute: morningMinute } },
+        extra: { url: "/", slot: "morning" },
+        autoCancel: true,
+      },
+      {
+        id: NATIVE_EVENING_NOTIFICATION_ID,
+        title: eveningMessage.title,
+        body: eveningMessage.body,
+        largeBody: eveningMessage.body,
+        channelId: ANDROID_REMINDER_CHANNEL_ID,
+        schedule: { on: { hour: eveningHour, minute: eveningMinute } },
+        extra: { url: "/", slot: "evening" },
+        autoCancel: true,
+      },
+    ],
+  });
+}
+
 export function getNextNotificationDelay(time: string, now = new Date()): number {
   const [hours, minutes] = parseTime(time);
   const next = new Date(now);
@@ -288,6 +404,24 @@ export function isValidNotificationTime(value: string): boolean {
 
 export function notificationLibrarySize(): number {
   return NOTIFICATION_LIBRARY.length;
+}
+
+async function ensureAndroidReminderChannel(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") return;
+
+  try {
+    await LocalNotifications.createChannel({
+      id: ANDROID_REMINDER_CHANNEL_ID,
+      name: "Напоминания",
+      description: "Короткие утренние и вечерние напоминания",
+      importance: 3,
+      visibility: 0,
+      vibration: false,
+      lights: false,
+    });
+  } catch {
+    // Android below API 26 does not use notification channels.
+  }
 }
 
 async function registerNotificationServiceWorker(): Promise<ServiceWorkerRegistration> {
@@ -410,4 +544,10 @@ function startOfDay(date: Date): Date {
 
 function getCurrentNotificationSlot(now = new Date()): NotificationSlot {
   return now.getHours() < 15 ? "morning" : "evening";
+}
+
+function mapNativePermission(permission: PermissionState): NotificationPermission {
+  if (permission === "granted") return "granted";
+  if (permission === "denied") return "denied";
+  return "default";
 }

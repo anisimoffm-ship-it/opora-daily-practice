@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     ".vercel/**",
     "out/**",
     "build/**",
+    "android/**",
+    "ios/**",
     "src-tauri/target/**",
     "next-env.d.ts",
   ]),

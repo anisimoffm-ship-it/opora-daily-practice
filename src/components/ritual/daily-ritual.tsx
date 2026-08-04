@@ -1,33 +1,58 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowLeft, Check, Sprout } from "lucide-react";
+import { ArrowLeft, Sprout } from "lucide-react";
 import { PracticeSettling } from "@/components/ritual/practice-settling";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { MOBILE_BACK_BUTTON_EVENT } from "@/lib/mobile-navigation";
 import {
+  RITUAL_STATES,
   RITUAL_STORAGE_CHANGED,
   RITUAL_VIEW_CHANGED,
   completeTodayRitual,
   getLocalDateKey,
   getRitualCompletions,
-  getTodaySkill,
-  getWeekDays,
+  getSkillById,
+  getSkillForState,
   isCompletedToday,
   type RitualCompletion,
   type RitualSkill,
+  type RitualStateId,
 } from "@/lib/daily-ritual";
 
-type RitualStep = "home" | "settling" | "practice" | "complete";
+type RitualStep =
+  | "home"
+  | "settling"
+  | "check-in"
+  | "guide"
+  | "practice"
+  | "reflect"
+  | "support"
+  | "complete";
 
-const WEEKDAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+type RitualOutcomeId = "clearer" | "space" | "next-step" | "same" | "heavier";
+
+const RITUAL_OUTCOMES: Array<{ id: RitualOutcomeId; label: string }> = [
+  { id: "clearer", label: "Стало чуть яснее" },
+  { id: "space", label: "Появилось немного пространства" },
+  { id: "next-step", label: "Обозначился следующий шаг" },
+  { id: "same", label: "Ничего не изменилось" },
+  { id: "heavier", label: "Стало заметно тяжелее" },
+];
 
 export function DailyRitual() {
   const [step, setStep] = useState<RitualStep>("home");
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [selectedStateId, setSelectedStateId] = useState<RitualStateId>();
+  const [answer, setAnswer] = useState("");
+  const [answeredMentally, setAnsweredMentally] = useState(false);
+  const [outcome, setOutcome] = useState<RitualOutcomeId>();
   const [completions, setCompletions] = useState<RitualCompletion[]>([]);
-  const todaySkill = useMemo(() => getTodaySkill(), []);
+
+  const selectedSkill = useMemo(
+    () => (selectedStateId ? getSkillForState(selectedStateId) : undefined),
+    [selectedStateId],
+  );
 
   const syncCompletions = useCallback(() => {
     setCompletions(getRitualCompletions());
@@ -51,304 +76,540 @@ export function DailyRitual() {
     };
   }, [step]);
 
-  const completedToday = isCompletedToday(completions);
+  useEffect(() => {
+    document.querySelector<HTMLElement>("[data-ritual-heading]")?.focus({ preventScroll: true });
+  }, [step]);
 
-  const startPractice = () => {
-    setAnswers({});
-    softHaptic();
+  const goBack = useCallback(() => {
+    setStep((current) => {
+      if (current === "settling") return "home";
+      if (current === "check-in") return "settling";
+      if (current === "guide") return "check-in";
+      if (current === "practice") return "guide";
+      if (current === "reflect") return "practice";
+      if (current === "support") return "reflect";
+      return "home";
+    });
+  }, []);
+
+  useEffect(() => {
+    if (step === "home") return;
+
+    const handleMobileBack = (event: Event) => {
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      goBack();
+    };
+
+    window.addEventListener(MOBILE_BACK_BUTTON_EVENT, handleMobileBack);
+    return () => window.removeEventListener(MOBILE_BACK_BUTTON_EVENT, handleMobileBack);
+  }, [goBack, step]);
+
+  const completedToday = isCompletedToday(completions);
+  const previousCompletion = completions.find(
+    (completion) => completion.date !== getLocalDateKey(new Date()),
+  );
+  const previousSkill = previousCompletion ? getSkillById(previousCompletion.skillId) : undefined;
+  const todayCompletion = completions.find(
+    (completion) => completion.date === getLocalDateKey(new Date()),
+  );
+  const todayCompletedSkill = todayCompletion ? getSkillById(todayCompletion.skillId) : undefined;
+
+  const startRitual = () => {
+    setSelectedStateId(undefined);
+    setAnswer("");
+    setAnsweredMentally(false);
+    setOutcome(undefined);
     setStep("settling");
   };
 
-  const finishSettling = useCallback(() => {
-    softHaptic();
-    setStep("practice");
-  }, []);
-
-  const finishPractice = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    completeTodayRitual(todaySkill.id);
+  const finishRitual = () => {
+    if (!selectedSkill) return;
+    completeTodayRitual(selectedSkill.id);
     syncCompletions();
     setStep("complete");
   };
 
   if (step === "settling") {
-    return <PracticeSettling onComplete={finishSettling} />;
+    return <PracticeSettling onComplete={() => setStep("check-in")} onCancel={() => setStep("home")} />;
   }
 
-  if (step === "practice") {
+  if (step === "check-in") {
+    return (
+      <CheckInScreen
+        selectedStateId={selectedStateId}
+        onSelect={setSelectedStateId}
+        onBack={goBack}
+        onContinue={() => setStep("guide")}
+      />
+    );
+  }
+
+  if (step === "guide" && selectedSkill) {
+    return (
+      <PracticeGuide
+        skill={selectedSkill}
+        onBack={goBack}
+        onContinue={() => setStep("practice")}
+      />
+    );
+  }
+
+  if (step === "practice" && selectedSkill) {
     return (
       <PracticeScreen
-        skill={todaySkill}
-        answers={answers}
-        onAnswersChange={setAnswers}
-        onBack={() => setStep("home")}
-        onComplete={finishPractice}
+        skill={selectedSkill}
+        answer={answer}
+        answeredMentally={answeredMentally}
+        onAnswerChange={setAnswer}
+        onAnsweredMentallyChange={setAnsweredMentally}
+        onBack={goBack}
+        onContinue={() => setStep("reflect")}
+      />
+    );
+  }
+
+  if (step === "reflect" && selectedSkill) {
+    return (
+      <ReflectionScreen
+        answer={answer}
+        outcome={outcome}
+        onOutcomeChange={setOutcome}
+        onBack={goBack}
+        onContinue={() => setStep("support")}
+      />
+    );
+  }
+
+  if (step === "support" && selectedSkill && outcome) {
+    return (
+      <SupportScreen
+        skill={selectedSkill}
+        outcome={outcome}
+        onBack={goBack}
+        onComplete={finishRitual}
       />
     );
   }
 
   if (step === "complete") {
+    return <CompleteScreen onClose={() => setStep("home")} />;
+  }
+
+  return (
+    <HomeScreen
+      completedToday={completedToday}
+      previousSkill={previousSkill}
+      todaySkill={todayCompletedSkill}
+      onStart={startRitual}
+    />
+  );
+}
+
+function HomeScreen({
+  completedToday,
+  previousSkill,
+  todaySkill,
+  onStart,
+}: {
+  completedToday: boolean;
+  previousSkill?: RitualSkill;
+  todaySkill?: RitualSkill;
+  onStart: () => void;
+}) {
+  if (completedToday) {
     return (
-      <CompleteScreen
-        completions={completions}
-        onClose={() => setStep("home")}
-      />
+      <div className="flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+        <section className="space-y-5 pt-6">
+          <p className="text-sm text-muted-foreground">Сегодня</p>
+          <h1
+            className="max-w-sm text-4xl font-medium leading-tight tracking-tight outline-none"
+            data-ritual-heading
+            tabIndex={-1}
+          >
+            На сегодня достаточно.
+          </h1>
+          <p className="max-w-sm text-base leading-relaxed text-muted-foreground">
+            {todaySkill
+              ? `Сегодня ты уделил время практике «${todaySkill.name}». Больше ничего делать не нужно.`
+              : "Сегодня ты уже уделил себе немного времени. Больше ничего делать не нужно."}
+          </p>
+        </section>
+
+        <Button type="button" variant="secondary" size="lg" className="h-12 w-full" onClick={onStart}>
+          Повторить, если хочется
+        </Button>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-8">
-      <section className="space-y-3 pt-2">
-        <p className="text-sm text-muted-foreground">{getGreeting()}.</p>
-        <h1 className="text-3xl font-medium tracking-tight">Две спокойные минуты для себя.</h1>
+    <div className="flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+      <section className="space-y-6 pt-4">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">{getGreeting()}.</p>
+          <h1
+            className="max-w-sm text-4xl font-medium leading-tight tracking-tight outline-none"
+            data-ritual-heading
+            tabIndex={-1}
+          >
+            Что сейчас больше всего занимает твои мысли?
+          </h1>
+        </div>
+
+        {previousSkill && (
+          <div className="max-w-sm border-l-2 border-primary/35 pl-4 text-sm leading-relaxed">
+            <p className="text-muted-foreground">В прошлый раз была практика</p>
+            <p className="mt-1 font-medium">{previousSkill.name}</p>
+            <p className="mt-2 text-muted-foreground">Как сейчас?</p>
+          </div>
+        )}
       </section>
 
-      <section className="space-y-4 rounded-lg bg-card p-5 shadow-sm ring-1 ring-foreground/10">
-        <div className="space-y-2 text-center">
-          <div className="mx-auto flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Sprout className="size-5" />
-          </div>
-          <p className="text-sm text-muted-foreground">Сегодня:</p>
-          <h2 className="text-2xl font-medium tracking-tight">{todaySkill.name}</h2>
-          <p className="text-sm text-muted-foreground">≈ 2 минуты</p>
-        </div>
-        <Button type="button" size="lg" className="h-12 w-full" onClick={startPractice}>
-          {completedToday ? "Пройти ещё раз" : "Начать практику"}
+      <section className="space-y-3">
+        <Button type="button" size="lg" className="h-12 w-full" onClick={onStart}>
+          Начать с паузы
         </Button>
+        <p className="text-center text-sm leading-relaxed text-muted-foreground">
+          Около минуты. Можно остановиться в любой момент.
+        </p>
       </section>
+    </div>
+  );
+}
+
+function CheckInScreen({
+  selectedStateId,
+  onSelect,
+  onBack,
+  onContinue,
+}: {
+  selectedStateId?: RitualStateId;
+  onSelect: (stateId: RitualStateId) => void;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (selectedStateId) onContinue();
+  };
+
+  return (
+    <form onSubmit={submit} className="ritual-screen-enter space-y-6 pb-8">
+      <BackButton onClick={onBack} />
+      <fieldset className="space-y-5">
+        <legend className="sr-only">Что происходит с тобой сейчас?</legend>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">Не нужно подбирать точное слово</p>
+          <h1
+            className="text-3xl font-medium leading-tight tracking-tight outline-none"
+            data-ritual-heading
+            tabIndex={-1}
+          >
+            Что происходит с тобой сейчас?
+          </h1>
+        </div>
+
+        <div className="list gap-2 bg-transparent" role="radiogroup">
+          {RITUAL_STATES.map((state) => (
+            <label
+              key={state.id}
+              className="list-row min-h-14 cursor-pointer grid-cols-[1fr_auto] items-center rounded-box border border-border bg-base-200/55 px-4 py-3 transition-colors has-[input:checked]:border-primary has-[input:checked]:bg-secondary focus-within:ring-3 focus-within:ring-ring active:bg-secondary/80"
+            >
+              <span className="text-base leading-snug">{state.label}</span>
+              <input
+                type="radio"
+                name="current-state"
+                value={state.id}
+                className="radio radio-sm"
+                checked={selectedStateId === state.id}
+                onChange={() => onSelect(state.id)}
+              />
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <Button type="submit" size="lg" className="h-12 w-full" disabled={!selectedStateId}>
+        Продолжить
+      </Button>
+    </form>
+  );
+}
+
+function PracticeGuide({
+  skill,
+  onBack,
+  onContinue,
+}: {
+  skill: RitualSkill;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="ritual-screen-enter space-y-6 pb-8">
+      <BackButton onClick={onBack} />
+      <section className="space-y-3">
+        <p className="text-sm text-muted-foreground">По твоему выбору</p>
+        <h1
+          className="text-3xl font-medium leading-tight tracking-tight outline-none"
+          data-ritual-heading
+          tabIndex={-1}
+        >
+          {skill.name}
+        </h1>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Одна короткая практика. Здесь нет правильного ответа.
+        </p>
+      </section>
+
+      <dl className="divide-y divide-border border-y border-border">
+        <GuideItem title="Зачем это может помочь" body={skill.whyItWorks} />
+        <GuideItem title="Что сделать" body={skill.instruction} />
+        <GuideItem title="Пример формы" body={skill.example} />
+        <GuideItem title="Комментарий психолога" body={skill.psychologistNote} />
+        <GuideItem title="Что можно заметить" body={skill.possibleEffect} />
+      </dl>
+
+      <div className="rounded-box bg-secondary/60 p-4 text-sm leading-relaxed text-muted-foreground">
+        {skill.safetyNote}
+      </div>
+
+      <Button type="button" size="lg" className="h-12 w-full" onClick={onContinue}>
+        Перейти к вопросу
+      </Button>
+    </div>
+  );
+}
+
+function GuideItem({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="space-y-1.5 py-4">
+      <dt className="text-sm font-medium">{title}</dt>
+      <dd className="text-sm leading-relaxed text-muted-foreground">{body}</dd>
     </div>
   );
 }
 
 function PracticeScreen({
   skill,
-  answers,
-  onAnswersChange,
+  answer,
+  answeredMentally,
+  onAnswerChange,
+  onAnsweredMentallyChange,
   onBack,
-  onComplete,
+  onContinue,
 }: {
   skill: RitualSkill;
-  answers: Record<string, string>;
-  onAnswersChange: (answers: Record<string, string>) => void;
+  answer: string;
+  answeredMentally: boolean;
+  onAnswerChange: (answer: string) => void;
+  onAnsweredMentallyChange: (answered: boolean) => void;
   onBack: () => void;
-  onComplete: (event: FormEvent<HTMLFormElement>) => void;
+  onContinue: () => void;
 }) {
-  const [phase, setPhase] = useState(0);
-  const questionIndex = phase - 1;
-  const currentQuestion = skill.questions[questionIndex];
-  const isQuestionPhase = Boolean(currentQuestion);
-  const isSupportPhase = phase === skill.questions.length + 1;
-  const finalQuestion = skill.questions.at(-1);
-  const personalAnswer = finalQuestion ? answers[finalQuestion.id]?.trim() : "";
-
-  useEffect(() => {
-    document.querySelector<HTMLElement>("[data-practice-step-heading]")?.focus();
-  }, [phase]);
-
-  const updateAnswer = (id: string, value: string) => {
-    onAnswersChange({ ...answers, [id]: value });
-  };
-
-  const next = () => setPhase((current) => Math.min(current + 1, skill.questions.length + 1));
-  const back = () => {
-    if (phase === 0) {
-      onBack();
-      return;
-    }
-    setPhase((current) => current - 1);
+  const canContinue = Boolean(answer.trim() || answeredMentally);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (canContinue) onContinue();
   };
 
   return (
-    <form onSubmit={onComplete} className="practice-screen-enter space-y-5 pb-8">
-      <Button type="button" variant="ghost" size="sm" className="-ml-2 h-11" onClick={back}>
-        <ArrowLeft className="size-4" />
-        Назад
-      </Button>
-
-      <section className="space-y-2">
-        <p className="text-sm text-muted-foreground">Сегодня:</p>
-        <h1 className="text-3xl font-medium tracking-tight">{skill.name}</h1>
+    <form onSubmit={submit} className="ritual-screen-enter space-y-6 pb-8">
+      <BackButton onClick={onBack} />
+      <section className="space-y-3">
+        <p className="text-sm text-muted-foreground">{skill.name}</p>
+        <label
+          htmlFor={skill.question.id}
+          className="block text-3xl font-medium leading-tight tracking-tight outline-none"
+          data-ritual-heading
+          tabIndex={-1}
+        >
+          {skill.question.label}
+        </label>
+        <p id={`${skill.question.id}-guidance`} className="text-sm leading-relaxed text-muted-foreground">
+          {skill.question.guidance}
+        </p>
       </section>
 
-      {phase === 0 && (
-        <RitualStepCard
-          title="Выбери один момент"
-          body={skill.recallPrompt}
-          recommendations={skill.recommendations}
-          actionLabel="Перейти к вопросам"
-          onAction={next}
+      <Textarea
+        id={skill.question.id}
+        name={skill.question.id}
+        value={answer}
+        onChange={(event) => onAnswerChange(event.target.value)}
+        placeholder={skill.question.placeholder}
+        aria-describedby={`${skill.question.id}-guidance ${skill.question.id}-privacy`}
+        className="min-h-36 resize-none bg-base-200/55 px-4 py-3"
+      />
+
+      <p id={`${skill.question.id}-privacy`} className="text-sm leading-relaxed text-muted-foreground">
+        Запиши одну-две фразы или ответь про себя. «Не знаю» тоже подходит. Личный текст не сохранится.
+      </p>
+
+      <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-box border border-border bg-secondary/45 px-4 py-3 text-sm font-medium focus-within:ring-3 focus-within:ring-ring">
+        <input
+          type="checkbox"
+          name="answered-mentally"
+          className="checkbox checkbox-sm"
+          checked={answeredMentally}
+          onChange={(event) => onAnsweredMentallyChange(event.target.checked)}
         />
-      )}
+        Я ответил про себя
+      </label>
 
-      {isQuestionPhase && currentQuestion && (
-        <section className="space-y-4 rounded-lg bg-card p-5 shadow-sm ring-1 ring-foreground/10">
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Шаг {questionIndex + 1} из {skill.questions.length}
-            </p>
-            <label
-              htmlFor={currentQuestion.id}
-              className="block text-xl font-medium leading-snug outline-none"
-              data-practice-step-heading
-              tabIndex={-1}
-            >
-              {currentQuestion.label}
-            </label>
-            <div className="space-y-1 rounded-lg bg-secondary/60 p-3 text-sm leading-relaxed">
-              <p className="font-medium">Как ответить</p>
-              <p className="text-muted-foreground">{currentQuestion.guidance}</p>
-            </div>
-            {questionIndex === 0 && (
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Можно ответить про себя или записать 1–2 фразы. Текст не сохранится.
-              </p>
-            )}
-          </div>
-          <Textarea
-            id={currentQuestion.id}
-            value={answers[currentQuestion.id] ?? ""}
-            onChange={(event) => updateAnswer(currentQuestion.id, event.target.value)}
-            placeholder={`Например: ${currentQuestion.placeholder}`}
-            className="min-h-24 bg-background"
-          />
-          <Button type="button" size="lg" className="h-12 w-full" onClick={next}>
-            {questionIndex === skill.questions.length - 1 ? "Посмотреть итог" : "Следующий вопрос"}
-          </Button>
-        </section>
-      )}
-
-      {isSupportPhase && (
-        <section className="space-y-4 rounded-lg bg-secondary/70 p-5">
-          <div className="space-y-2">
-            <h2
-              className="text-sm font-medium outline-none"
-              data-practice-step-heading
-              tabIndex={-1}
-            >
-              {personalAnswer ? "Твои слова" : "Можно попробовать"}
-            </h2>
-            <p className="text-xl font-medium leading-snug">{personalAnswer || skill.support}</p>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Сделай паузу. Что изменилось сейчас — в мыслях, чувствах или теле? Если ничего не изменилось, это тоже нормально.
-            </p>
-            <div className="space-y-1 rounded-lg bg-background/70 p-3 text-sm leading-relaxed">
-              <p className="font-medium">Что можно сделать дальше</p>
-              <p className="text-muted-foreground">{skill.nextStep}</p>
-            </div>
-          </div>
-          <Button type="submit" size="lg" className="h-12 w-full">
-            Завершить практику
-          </Button>
-        </section>
-      )}
+      <Button type="submit" size="lg" className="h-12 w-full" disabled={!canContinue}>
+        Увидеть свой ответ
+      </Button>
     </form>
   );
 }
 
-function RitualStepCard({
-  title,
-  body,
-  recommendations,
-  actionLabel,
-  onAction,
+function ReflectionScreen({
+  answer,
+  outcome,
+  onOutcomeChange,
+  onBack,
+  onContinue,
 }: {
-  title: string;
-  body: string;
-  recommendations: string[];
-  actionLabel: string;
-  onAction: () => void;
+  answer: string;
+  outcome?: RitualOutcomeId;
+  onOutcomeChange: (outcome: RitualOutcomeId) => void;
+  onBack: () => void;
+  onContinue: () => void;
 }) {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (outcome) onContinue();
+  };
+
   return (
-    <section className="space-y-4 rounded-lg bg-card p-5 shadow-sm ring-1 ring-foreground/10">
-      <div className="space-y-2">
-        <h2
-          className="text-sm font-medium outline-none"
-          data-practice-step-heading
+    <form onSubmit={submit} className="ritual-screen-enter space-y-7 pb-8">
+      <BackButton onClick={onBack} />
+
+      <section className="space-y-3 border-l-2 border-primary/40 pl-4">
+        <p className="text-sm text-muted-foreground">{answer.trim() ? "Твои слова" : "Ответ был про себя"}</p>
+        <p className="text-xl font-medium leading-relaxed">
+          {answer.trim() || "Не нужно подбирать правильную фразу или записывать её для приложения."}
+        </p>
+      </section>
+
+      <fieldset className="space-y-4">
+        <legend
+          className="text-3xl font-medium leading-tight tracking-tight outline-none"
+          data-ritual-heading
           tabIndex={-1}
         >
-          {title}
-        </h2>
-        <p className="text-xl font-medium leading-snug">{body}</p>
-      </div>
-      <div className="space-y-2 rounded-lg bg-secondary/60 p-3">
-        <h3 className="text-sm font-medium">Как выполнять</h3>
-        <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-muted-foreground">
-          {recommendations.map((recommendation) => (
-            <li key={recommendation}>{recommendation}</li>
+          Что изменилось?
+        </legend>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Любой ответ подходит. Это не оценка практики.
+        </p>
+        <div className="grid gap-2" role="radiogroup">
+          {RITUAL_OUTCOMES.map((option) => (
+            <label
+              key={option.id}
+              className="flex min-h-13 cursor-pointer items-center justify-between gap-4 rounded-box border border-border bg-base-200/55 px-4 py-3 transition-colors has-[input:checked]:border-primary has-[input:checked]:bg-secondary focus-within:ring-3 focus-within:ring-ring active:bg-secondary/80"
+            >
+              <span className="text-sm leading-snug">{option.label}</span>
+              <input
+                type="radio"
+                name="ritual-outcome"
+                value={option.id}
+                className="radio radio-sm"
+                checked={outcome === option.id}
+                onChange={() => onOutcomeChange(option.id)}
+              />
+            </label>
           ))}
-        </ul>
-      </div>
-      <Button type="button" size="lg" className="h-12 w-full" onClick={onAction}>
-        {actionLabel}
+        </div>
+      </fieldset>
+
+      <Button type="submit" size="lg" className="h-12 w-full" disabled={!outcome}>
+        Продолжить
       </Button>
-    </section>
+    </form>
   );
 }
 
-function CompleteScreen({
-  completions,
-  onClose,
+function SupportScreen({
+  skill,
+  outcome,
+  onBack,
+  onComplete,
 }: {
-  completions: RitualCompletion[];
-  onClose: () => void;
+  skill: RitualSkill;
+  outcome: RitualOutcomeId;
+  onBack: () => void;
+  onComplete: () => void;
 }) {
+  const isHeavier = outcome === "heavier";
+
   return (
-    <div className="space-y-6 pb-8">
-      <section className="space-y-3 pt-2 text-center">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
-          <Check className="size-5" />
-        </div>
-        <h1 className="text-3xl font-medium tracking-tight">На сегодня достаточно.</h1>
-      </section>
+    <div className="ritual-screen-enter flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-10 pb-8">
+      <div className="space-y-8">
+        <BackButton onClick={onBack} />
+        <section className="space-y-4">
+          <h1
+            className="text-3xl font-medium leading-tight tracking-tight outline-none"
+            data-ritual-heading
+            tabIndex={-1}
+          >
+            {isHeavier ? "Сейчас лучше остановиться." : "Можно оставить это здесь."}
+          </h1>
+          <p className="text-lg leading-relaxed">
+            {isHeavier
+              ? "Верни внимание к тому, что находится вокруг. Если есть реальная угроза, сначала ищи безопасность и помощь."
+              : skill.support}
+          </p>
+        </section>
 
-      <WeekProgress completions={completions} highlightToday />
+        {!isHeavier && (
+          <section className="space-y-2 border-l-2 border-primary/35 pl-4">
+            <h2 className="text-sm font-medium">В реальной жизни</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">{skill.nextStep}</p>
+          </section>
+        )}
+      </div>
 
-      <Button type="button" variant="secondary" size="lg" className="h-12 w-full" onClick={onClose}>
-        На главную
+      <Button type="button" size="lg" className="h-12 w-full" onClick={onComplete}>
+        Завершить
       </Button>
     </div>
   );
 }
 
-function WeekProgress({
-  completions,
-  highlightToday = false,
-}: {
-  completions: RitualCompletion[];
-  highlightToday?: boolean;
-}) {
-  const weekDays = getWeekDays();
-  const completedDates = new Set(completions.map((completion) => completion.date));
-  const todayKey = getLocalDateKey(new Date());
-
+function CompleteScreen({ onClose }: { onClose: () => void }) {
   return (
-    <section className="space-y-3 rounded-lg bg-card p-4 shadow-sm ring-1 ring-foreground/10">
-      <h2 className="text-sm font-medium">Небольшие паузы на этой неделе</h2>
-      <div className="grid grid-cols-7 gap-2">
-        {weekDays.map((day, index) => {
-          const key = getLocalDateKey(day);
-          const completed = completedDates.has(key);
-          const isToday = key === todayKey;
-          return (
-            <div key={key} className="space-y-2 text-center">
-              <p className="text-xs text-muted-foreground">{WEEKDAY_LABELS[index]}</p>
-              <span
-                className={cn(
-                  "mx-auto flex size-8 items-center justify-center rounded-full border text-sm font-medium transition-colors",
-                  completed
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-muted-foreground",
-                  highlightToday && isToday && "ritual-day-fill",
-                )}
-                aria-label={completed ? `${WEEKDAY_LABELS[index]} выполнено` : `${WEEKDAY_LABELS[index]} не выполнено`}
-              >
-                {completed ? "●" : "○"}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
+    <div className="ritual-screen-enter flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+      <section className="space-y-5 pt-14">
+        <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden="true">
+          <Sprout className="size-5" />
+        </div>
+        <h1
+          className="max-w-sm text-4xl font-medium leading-tight tracking-tight outline-none"
+          data-ritual-heading
+          tabIndex={-1}
+        >
+          На сегодня достаточно.
+        </h1>
+        <p className="max-w-xs text-base leading-relaxed text-muted-foreground">
+          Практика закончена. Больше ничего делать не нужно.
+        </p>
+      </section>
+
+      <Button type="button" variant="secondary" size="lg" className="h-12 w-full" onClick={onClose}>
+        До завтра
+      </Button>
+    </div>
+  );
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button type="button" variant="ghost" size="sm" className="-ml-2 h-12" onClick={onClick}>
+      <ArrowLeft className="size-4" />
+      Назад
+    </Button>
   );
 }
 
@@ -358,10 +619,4 @@ function getGreeting() {
   if (hour < 12) return "Доброе утро";
   if (hour < 18) return "Добрый день";
   return "Добрый вечер";
-}
-
-function softHaptic() {
-  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-    navigator.vibrate(8);
-  }
 }

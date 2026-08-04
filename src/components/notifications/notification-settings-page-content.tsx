@@ -34,11 +34,17 @@ export function NotificationSettingsPageContent() {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
+    let active = true;
     const timeout = window.setTimeout(() => {
       setSettings(getNotificationSettings());
-      setPermission(getNotificationPermission());
+      void getNotificationPermission().then((nextPermission) => {
+        if (active) setPermission(nextPermission);
+      });
     }, 0);
-    return () => window.clearTimeout(timeout);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
   }, []);
 
   const updateSettings = (nextSettings: NotificationSettings) => {
@@ -51,11 +57,12 @@ export function NotificationSettingsPageContent() {
 
     if (!enabled) {
       updateSettings({ ...settings, enabled: false });
-      setPermission(getNotificationPermission());
+      setPermission(await getNotificationPermission());
       return;
     }
 
-    const nextPermission = getNotificationPermission() === "granted"
+    const currentPermission = await getNotificationPermission();
+    const nextPermission = currentPermission === "granted"
       ? "granted"
       : await requestNotificationPermission();
     setPermission(nextPermission);
@@ -82,7 +89,8 @@ export function NotificationSettingsPageContent() {
 
   const sendPreview = async () => {
     setNotice("");
-    const nextPermission = getNotificationPermission() === "granted"
+    const currentPermission = await getNotificationPermission();
+    const nextPermission = currentPermission === "granted"
       ? "granted"
       : await requestNotificationPermission();
     setPermission(nextPermission);
@@ -101,9 +109,9 @@ export function NotificationSettingsPageContent() {
   return (
     <div className="space-y-6 pb-8">
       <section className="space-y-3">
-        <h1 className="text-3xl font-medium tracking-tight">Уведомления</h1>
+        <h1 className="text-3xl font-medium tracking-tight">Напоминания</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Напоминания появятся утром и вечером, пока приложение открыто.
+          На iOS и Android напоминания работают по расписанию. В браузере они появляются, пока вкладка открыта.
         </p>
       </section>
 
@@ -114,31 +122,22 @@ export function NotificationSettingsPageContent() {
               <p className="text-base font-medium">Напоминания</p>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {settings.enabled
-                  ? "Включены. Работают, пока приложение открыто."
+                  ? "Включены на этом устройстве."
                   : PERMISSION_COPY[permission]}
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-label="Включить напоминания"
-              aria-checked={settings.enabled}
-              onClick={() => void toggleEnabled(!settings.enabled)}
-              className="flex h-11 w-14 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span
-                className={`flex h-7 w-12 items-center rounded-full p-0.5 transition-colors ${
-                  settings.enabled ? "bg-primary" : "bg-input"
-                }`}
-                aria-hidden="true"
-              >
-                <span
-                  className={`size-6 rounded-full bg-white shadow-sm transition-transform ${
-                    settings.enabled ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </span>
-            </button>
+            <label className="flex min-h-12 min-w-14 shrink-0 cursor-pointer items-center justify-center">
+              <span className="sr-only">Включить напоминания</span>
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Включить напоминания"
+                aria-checked={settings.enabled}
+                checked={settings.enabled}
+                onChange={(event) => void toggleEnabled(event.target.checked)}
+                className="toggle toggle-primary toggle-lg focus-visible:ring-3 focus-visible:ring-ring"
+              />
+            </label>
           </div>
 
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-3">
@@ -161,24 +160,32 @@ export function NotificationSettingsPageContent() {
         </CardContent>
       </Card>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium tracking-tight">Как писать</h2>
-        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Тон уведомлений">
+      <fieldset className="fieldset space-y-3">
+        <legend className="fieldset-legend text-lg font-medium tracking-tight text-foreground">
+          Как писать
+        </legend>
+        <div className="grid grid-cols-2 gap-2">
           {STYLES.map((style) => {
             const selected = settings.style === style;
             return (
-              <button
+              <label
                 key={style}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => updateStyle(style)}
-                className={`min-h-11 rounded-lg px-3 py-2 text-sm font-medium ring-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  selected ? "ring-primary" : "ring-foreground/10 hover:bg-secondary/60"
+                className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-field border px-3 py-2 text-sm font-medium transition-colors focus-within:ring-3 focus-within:ring-ring ${
+                  selected
+                    ? "border-primary bg-primary/8"
+                    : "border-border bg-background hover:bg-secondary/60"
                 }`}
               >
-                {NOTIFICATION_STYLE_LABELS[style]}
-              </button>
+                <input
+                  type="radio"
+                  name="notification-style"
+                  value={style}
+                  checked={selected}
+                  onChange={() => updateStyle(style)}
+                  className="radio radio-primary radio-sm"
+                />
+                <span>{NOTIFICATION_STYLE_LABELS[style]}</span>
+              </label>
             );
           })}
         </div>
@@ -187,7 +194,7 @@ export function NotificationSettingsPageContent() {
           <p className="mt-2 text-sm font-medium">{activePreview.title}</p>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{activePreview.body}</p>
         </div>
-        <Button type="button" size="lg" className="w-full" onClick={sendPreview}>
+        <Button type="button" variant="secondary" size="lg" className="w-full" onClick={sendPreview}>
           <Send className="size-4" />
           Показать тестовое уведомление
         </Button>
@@ -196,7 +203,7 @@ export function NotificationSettingsPageContent() {
             {notice}
           </p>
         )}
-      </section>
+      </fieldset>
     </div>
   );
 }
@@ -226,7 +233,7 @@ function TimeField({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 bg-background"
+        className="h-12 bg-background"
       />
     </div>
   );

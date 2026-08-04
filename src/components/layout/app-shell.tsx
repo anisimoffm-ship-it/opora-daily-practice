@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Bell, Sprout } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { ArrowLeft, Bell, Sprout } from "lucide-react";
+import { NativeNavigation } from "@/components/layout/native-navigation";
 import { NotificationScheduler } from "@/components/notifications/notification-scheduler";
 import { RITUAL_VIEW_CHANGED } from "@/lib/daily-ritual";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isHome = pathname === "/";
   const [ritualActive, setRitualActive] = useState(false);
 
@@ -30,26 +32,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-5 pb-8 sm:px-6">
+    <div className="app-shell mx-auto flex w-full max-w-lg flex-col">
+      <NativeNavigation />
       <NotificationScheduler />
-      <header className="sticky top-0 z-20 -mx-5 mb-8 flex items-center justify-between gap-4 bg-background/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:px-6">
-        {ritualActive ? (
-          <div className="inline-flex min-h-11 items-center gap-2" aria-label="Опора">
-            {brand}
-          </div>
-        ) : (
-          <Link href="/" className="inline-flex min-h-11 items-center gap-2">
-            {brand}
-          </Link>
-        )}
+      <header className="app-header sticky top-0 z-20 mb-8 flex items-center justify-between gap-4 bg-background/95 pb-4 backdrop-blur">
+        <div className="flex min-w-0 items-center gap-1">
+          {!isHome && !ritualActive && (
+            <button
+              type="button"
+              aria-label="Вернуться на главную"
+              className="flex size-12 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96] active:bg-secondary"
+              onClick={() => router.push("/")}
+            >
+              <ArrowLeft className="size-6" />
+            </button>
+          )}
+          {ritualActive || !isHome ? (
+            <div className="inline-flex min-h-12 items-center gap-2" aria-label="Опора">
+              {brand}
+            </div>
+          ) : (
+            <Link href="/" className="inline-flex min-h-12 items-center gap-2">
+              {brand}
+            </Link>
+          )}
+        </div>
         {isHome && !ritualActive && (
           <nav className="flex items-center gap-2" aria-label="Основная навигация">
             <Link
               href="/notifications/"
               aria-label="Настройки уведомлений"
-              className="flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex size-12 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96] active:bg-secondary"
             >
-              <Bell className="size-4" />
+              <Bell className="size-6" />
             </Link>
           </nav>
         )}

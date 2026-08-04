@@ -1,44 +1,102 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
+
+@plugin "daisyui" {
+  themes: false;
+  logs: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "opora";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+  --color-base-100: #f7faf7;
+  --color-base-200: #edf1f3;
+  --color-base-300: #dbe5df;
+  --color-base-content: #253238;
+  --color-primary: #2f7d68;
+  --color-primary-content: #ffffff;
+  --color-secondary: #e8f0ec;
+  --color-secondary-content: #253238;
+  --color-accent: #f4e4dc;
+  --color-accent-content: #253238;
+  --color-neutral: #5c6d77;
+  --color-neutral-content: #f7faf7;
+  --color-info: #3f7184;
+  --color-info-content: #ffffff;
+  --color-success: #2f7d68;
+  --color-success-content: #ffffff;
+  --color-warning: #936a30;
+  --color-warning-content: #ffffff;
+  --color-error: #b43e48;
+  --color-error-content: #ffffff;
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "opora-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+  --color-base-100: #18211f;
+  --color-base-200: #202c29;
+  --color-base-300: #34413d;
+  --color-base-content: #edf5f1;
+  --color-primary: #7bc2a7;
+  --color-primary-content: #14201c;
+  --color-secondary: #263a33;
+  --color-secondary-content: #edf5f1;
+  --color-accent: #443732;
+  --color-accent-content: #f4ece8;
+  --color-neutral: #a8b9b2;
+  --color-neutral-content: #18211f;
+  --color-info: #87b9c8;
+  --color-info-content: #152225;
+  --color-success: #7bc2a7;
+  --color-success-content: #14201c;
+  --color-warning: #d9ae68;
+  --color-warning-content: #2a2114;
+  --color-error: #ed8e96;
+  --color-error-content: #2b1518;
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--app-font-sans);
+  --color-background: var(--color-base-100);
+  --color-foreground: var(--color-base-content);
+  --font-sans: var(--font-geist), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: var(--app-font-mono);
-  --font-heading: var(--app-font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
+  --font-heading: var(--font-geist), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-ring: var(--color-primary);
+  --color-input: var(--color-base-300);
+  --color-border: var(--color-base-300);
+  --color-destructive: var(--color-error);
+  --color-accent-foreground: var(--color-accent-content);
+  --color-muted-foreground: var(--color-neutral);
+  --color-muted: var(--color-base-200);
+  --color-secondary-foreground: var(--color-secondary-content);
+  --color-primary-foreground: var(--color-primary-content);
+  --color-popover-foreground: var(--color-base-content);
+  --color-popover: var(--color-base-100);
+  --color-card-foreground: var(--color-base-content);
+  --color-card: var(--color-base-100);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,85 +107,104 @@
 }
 
 :root {
-  --background: #f7faf7;
-  --foreground: #253238;
-  --app-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --background: var(--color-base-100);
+  --foreground: var(--color-base-content);
+  --app-safe-area-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --app-safe-area-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --app-safe-area-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --app-safe-area-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --app-font-sans: var(--font-geist), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --app-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --card: #ffffff;
-  --card-foreground: #253238;
-  --popover: #ffffff;
-  --popover-foreground: #253238;
-  --primary: #2f7d68;
-  --primary-foreground: #ffffff;
-  --secondary: #e8f0ec;
-  --secondary-foreground: #253238;
-  --muted: #edf1f3;
-  --muted-foreground: #5c6d77;
-  --accent: #f4e4dc;
-  --accent-foreground: #253238;
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: #dbe5df;
-  --input: #cfddd8;
-  --ring: #79b69f;
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --card: var(--color-base-100);
+  --card-foreground: var(--color-base-content);
+  --popover: var(--color-base-100);
+  --popover-foreground: var(--color-base-content);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-primary-content);
+  --secondary: var(--color-secondary);
+  --secondary-foreground: var(--color-secondary-content);
+  --muted: var(--color-base-200);
+  --muted-foreground: var(--color-neutral);
+  --accent: var(--color-accent);
+  --accent-foreground: var(--color-accent-content);
+  --destructive: var(--color-error);
+  --input: var(--color-base-300);
+  --ring: var(--color-primary);
   --radius: 0.75rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;
+    min-height: 100dvh;
+    background-image:
+      radial-gradient(
+        circle at 50% -10rem,
+        color-mix(in oklab, var(--color-primary) 10%, transparent),
+        transparent 30rem
+      ),
+      radial-gradient(
+        circle at 110% 72%,
+        color-mix(in oklab, var(--color-accent) 34%, transparent),
+        transparent 24rem
+      );
+    background-attachment: fixed;
+    overscroll-behavior-x: none;
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     @apply font-sans;
+    min-height: 100%;
+    background: var(--background);
+    text-size-adjust: 100%;
+  }
+}
+
+.app-shell {
+  min-height: 100dvh;
+  padding-right: calc(1.25rem + var(--app-safe-area-right));
+  padding-bottom: calc(2rem + var(--app-safe-area-bottom));
+  padding-left: calc(1.25rem + var(--app-safe-area-left));
+}
+
+.app-header {
+  margin-right: calc(-1.25rem - var(--app-safe-area-right));
+  margin-left: calc(-1.25rem - var(--app-safe-area-left));
+  padding-top: calc(1rem + var(--app-safe-area-top));
+  padding-right: calc(1.25rem + var(--app-safe-area-right));
+  padding-left: calc(1.25rem + var(--app-safe-area-left));
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  touch-action: manipulation;
+}
+
+@media (min-width: 640px) {
+  .app-shell {
+    padding-right: calc(1.5rem + var(--app-safe-area-right));
+    padding-left: calc(1.5rem + var(--app-safe-area-left));
+  }
+
+  .app-header {
+    margin-right: calc(-1.5rem - var(--app-safe-area-right));
+    margin-left: calc(-1.5rem - var(--app-safe-area-left));
+    padding-right: calc(1.5rem + var(--app-safe-area-right));
+    padding-left: calc(1.5rem + var(--app-safe-area-left));
+  }
+}
+
+@media (max-width: 639px) {
+  input,
+  textarea,
+  select {
+    font-size: 1rem;
   }
 }
 
@@ -166,59 +243,7 @@
   }
 }
 
-@keyframes settling-stage-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes settling-stage-leave {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.985);
-  }
-}
-
-@keyframes settling-petal-shift {
-  0% {
-    opacity: 0.24;
-    transform: rotate(var(--petal-angle)) translateY(8px) scale(0.62);
-  }
-  52% {
-    opacity: 0.72;
-    transform: rotate(var(--petal-angle)) translateY(-7px) scale(1);
-  }
-  100% {
-    opacity: 0.46;
-    transform: rotate(var(--petal-angle)) translateY(3px) scale(0.78);
-  }
-}
-
-@keyframes settling-core-shift {
-  0% {
-    opacity: 0.5;
-    transform: scale(0.76);
-  }
-  52% {
-    opacity: 0.9;
-    transform: scale(1.08);
-  }
-  100% {
-    opacity: 0.68;
-    transform: scale(0.9);
-  }
-}
-
-@keyframes practice-screen-enter {
+@keyframes ritual-screen-enter {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -241,87 +266,83 @@
   animation: ritual-day-fill 520ms ease-out both;
 }
 
-.settling-stage {
-  animation: settling-stage-enter 420ms ease-out both;
+.breath-cue {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--color-base-content);
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: 0.025em;
 }
 
-.settling-stage-leaving {
-  animation: settling-stage-leave 480ms ease-in both;
-  pointer-events: none;
+.breath-cue-exhale,
+.breath-cue-rest {
+  visibility: hidden;
+  opacity: 0;
 }
 
-.settling-orb {
+.breathing-orb-motion {
   position: relative;
-  width: 11rem;
-  height: 11rem;
-  filter: drop-shadow(0 18px 30px color-mix(in oklab, var(--primary) 14%, transparent));
+  width: clamp(13.5rem, 62vw, 15rem);
+  aspect-ratio: 1;
+  contain: layout;
+  isolation: isolate;
+  transform-origin: 50% 50%;
 }
 
-.settling-petal {
-  --petal-angle: 0deg;
-  --petal-delay: 0ms;
+.breathing-circle {
   position: absolute;
-  top: calc(50% - 5.8rem);
-  left: calc(50% - 2.25rem);
-  width: 4.5rem;
-  height: 6rem;
-  transform-origin: 50% 92%;
-  border-radius: 54% 46% 52% 48% / 62% 58% 42% 38%;
-  background: linear-gradient(
-    155deg,
-    color-mix(in oklab, var(--primary) 48%, white),
-    color-mix(in oklab, var(--secondary) 74%, transparent)
-  );
-  animation: settling-petal-shift 4s cubic-bezier(0.4, 0, 0.2, 1) var(--petal-delay) both;
-}
-
-.settling-petal:nth-child(even) {
-  background: linear-gradient(
-    155deg,
-    color-mix(in oklab, var(--accent) 82%, white),
-    color-mix(in oklab, var(--primary) 24%, transparent)
-  );
-}
-
-.settling-core {
-  position: absolute;
-  top: calc(50% - 2.25rem);
-  left: calc(50% - 2.25rem);
-  width: 4.5rem;
-  height: 4.5rem;
+  inset: 0;
   border-radius: 50%;
-  background: radial-gradient(
-    circle at 38% 32%,
-    color-mix(in oklab, white 86%, var(--accent)),
-    color-mix(in oklab, var(--primary) 56%, var(--secondary))
-  );
-  box-shadow: 0 0 36px color-mix(in oklab, var(--primary) 22%, transparent);
-  animation: settling-core-shift 4s cubic-bezier(0.4, 0, 0.2, 1) both;
+  background: color-mix(in oklab, var(--color-primary) 28%, var(--color-base-100));
+  transform: scale(0.72);
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
 }
 
-.practice-screen-enter {
-  animation: practice-screen-enter 560ms ease-out both;
+.settling-scene,
+.settling-copy,
+.breathing-stage {
+  transform-origin: 50% 50%;
+}
+
+.practice-screen-enter,
+.ritual-screen-enter {
+  animation: ritual-screen-enter 420ms ease-out both;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .settling-scene,
+  .settling-copy,
+  .breathing-stage,
+  .breath-cue,
+  .breathing-circle {
+    will-change: transform, opacity;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .leaf-grow,
   .leaf-grow-delayed,
   .ritual-day-fill,
-  .settling-stage,
-  .settling-stage-leaving,
-  .settling-petal,
-  .settling-core,
-  .practice-screen-enter {
+  .practice-screen-enter,
+  .ritual-screen-enter {
     animation: none;
   }
 
-  .settling-petal {
-    opacity: 0.46;
-    transform: rotate(var(--petal-angle)) scale(0.78);
+  .breath-cue-inhale,
+  .breath-cue-exhale {
+    display: none;
   }
 
-  .settling-core {
-    opacity: 0.68;
-    transform: scale(0.9);
+  .breath-cue-rest {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .breathing-circle {
+    transform: scale(0.88);
   }
 }
