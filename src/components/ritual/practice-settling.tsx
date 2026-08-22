@@ -184,7 +184,8 @@ export function PracticeSettling({
             <span className="breathing-circle" />
           </div>
           <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-            Расслабляться необязательно. Заметь дыхание в своём ритме или три предмета вокруг.
+            Расслабляться необязательно — можно заметить дыхание в своём ритме или предметы
+            вокруг, а затем продолжить или вернуться позже.
           </p>
         </div>
       </div>

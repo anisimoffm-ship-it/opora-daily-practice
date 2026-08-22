@@ -10,29 +10,42 @@ import {
   RITUAL_STATES,
   RITUAL_STORAGE_CHANGED,
   RITUAL_VIEW_CHANGED,
+  completeOnboarding,
   completeTodayRitual,
   getLocalDateKey,
   getRitualCompletions,
   getSkillById,
   getSkillForState,
+  hasCompletedOnboarding,
   isCompletedToday,
   type RitualCompletion,
+  type RitualQuestion,
   type RitualSkill,
   type RitualStateId,
 } from "@/lib/daily-ritual";
 
 type RitualStep =
+  | "loading"
+  | "onboarding-intro"
+  | "onboarding-control"
   | "home"
   | "settling"
   | "check-in"
   | "guide"
   | "practice"
+  | "explore"
   | "apply"
   | "reflect"
   | "support"
   | "complete";
 
 type RitualOutcomeId = "clearer" | "space" | "next-step" | "same" | "heavier";
+
+interface RitualReflectionItem {
+  label: string;
+  value: string;
+  answeredMentally: boolean;
+}
 
 const RITUAL_OUTCOMES: Array<{ id: RitualOutcomeId; label: string }> = [
   { id: "clearer", label: "Ситуация стала чуть яснее" },
@@ -43,10 +56,13 @@ const RITUAL_OUTCOMES: Array<{ id: RitualOutcomeId; label: string }> = [
 ];
 
 export function DailyRitual() {
-  const [step, setStep] = useState<RitualStep>("home");
+  const [step, setStep] = useState<RitualStep>("loading");
   const [selectedStateId, setSelectedStateId] = useState<RitualStateId>();
   const [answer, setAnswer] = useState("");
   const [answeredMentally, setAnsweredMentally] = useState(false);
+  const [explorationAnswers, setExplorationAnswers] = useState<string[]>([]);
+  const [explorationAnsweredMentally, setExplorationAnsweredMentally] = useState<boolean[]>([]);
+  const [explorationIndex, setExplorationIndex] = useState(0);
   const [applicationAnswer, setApplicationAnswer] = useState("");
   const [applicationAnsweredMentally, setApplicationAnsweredMentally] = useState(false);
   const [outcome, setOutcome] = useState<RitualOutcomeId>();
@@ -57,8 +73,47 @@ export function DailyRitual() {
     [selectedStateId],
   );
 
+  const reflectionItems = useMemo(() => {
+    if (!selectedSkill) return [];
+
+    const explorationItems = (selectedSkill.exploration ?? []).map((question, index) => ({
+      label: question.summaryLabel ?? question.label,
+      value: getQuestionAnswer(question, explorationAnswers[index] ?? ""),
+      answeredMentally: explorationAnsweredMentally[index] ?? false,
+    }));
+
+    return [
+      {
+        label: selectedSkill.question.summaryLabel ?? "Что ты заметил",
+        value: answer,
+        answeredMentally,
+      },
+      ...explorationItems,
+      {
+        label: selectedSkill.application.summaryLabel ?? "Что делать дальше",
+        value: applicationAnswer,
+        answeredMentally: applicationAnsweredMentally,
+      },
+    ];
+  }, [
+    answer,
+    answeredMentally,
+    applicationAnswer,
+    applicationAnsweredMentally,
+    explorationAnsweredMentally,
+    explorationAnswers,
+    selectedSkill,
+  ]);
+
   const syncCompletions = useCallback(() => {
     setCompletions(getRitualCompletions());
+  }, []);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setStep(hasCompletedOnboarding() ? "home" : "onboarding-intro");
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
@@ -73,7 +128,8 @@ export function DailyRitual() {
   }, [syncCompletions]);
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent(RITUAL_VIEW_CHANGED, { detail: step !== "home" }));
+    const isFocusedFlow = step !== "home" && step !== "loading";
+    window.dispatchEvent(new CustomEvent(RITUAL_VIEW_CHANGED, { detail: isFocusedFlow }));
     return () => {
       window.dispatchEvent(new CustomEvent(RITUAL_VIEW_CHANGED, { detail: false }));
     };
@@ -84,7 +140,29 @@ export function DailyRitual() {
   }, [step]);
 
   const goBack = useCallback(() => {
+    if (step === "onboarding-intro") {
+      completeOnboarding();
+      setStep("home");
+      return;
+    }
+
+    if (step === "explore") {
+      if (explorationIndex > 0) {
+        setExplorationIndex((current) => current - 1);
+      } else {
+        setStep("practice");
+      }
+      return;
+    }
+
+    if (step === "apply" && selectedSkill?.exploration?.length) {
+      setExplorationIndex(selectedSkill.exploration.length - 1);
+      setStep("explore");
+      return;
+    }
+
     setStep((current) => {
+      if (current === "onboarding-control") return "onboarding-intro";
       if (current === "settling") return "home";
       if (current === "check-in") return "settling";
       if (current === "guide") return "check-in";
@@ -94,10 +172,10 @@ export function DailyRitual() {
       if (current === "support") return "reflect";
       return "home";
     });
-  }, []);
+  }, [explorationIndex, selectedSkill, step]);
 
   useEffect(() => {
-    if (step === "home") return;
+    if (step === "home" || step === "loading") return;
 
     const handleMobileBack = (event: Event) => {
       if (event.defaultPrevented) return;
@@ -123,10 +201,23 @@ export function DailyRitual() {
     setSelectedStateId(undefined);
     setAnswer("");
     setAnsweredMentally(false);
+    setExplorationAnswers([]);
+    setExplorationAnsweredMentally([]);
+    setExplorationIndex(0);
     setApplicationAnswer("");
     setApplicationAnsweredMentally(false);
     setOutcome(undefined);
     setStep("settling");
+  };
+
+  const skipOnboarding = () => {
+    completeOnboarding();
+    setStep("home");
+  };
+
+  const startFirstRitual = () => {
+    completeOnboarding();
+    startRitual();
   };
 
   const finishRitual = () => {
@@ -135,6 +226,23 @@ export function DailyRitual() {
     syncCompletions();
     setStep("complete");
   };
+
+  if (step === "loading") {
+    return <div className="min-h-[calc(100dvh-9rem)]" aria-hidden="true" />;
+  }
+
+  if (step === "onboarding-intro") {
+    return (
+      <OnboardingIntroScreen
+        onContinue={() => setStep("onboarding-control")}
+        onSkip={skipOnboarding}
+      />
+    );
+  }
+
+  if (step === "onboarding-control") {
+    return <OnboardingControlScreen onBack={goBack} onStart={startFirstRitual} />;
+  }
 
   if (step === "settling") {
     return <PracticeSettling onComplete={() => setStep("check-in")} onCancel={() => setStep("home")} />;
@@ -148,6 +256,9 @@ export function DailyRitual() {
           if (stateId !== selectedStateId) {
             setAnswer("");
             setAnsweredMentally(false);
+            setExplorationAnswers([]);
+            setExplorationAnsweredMentally([]);
+            setExplorationIndex(0);
             setApplicationAnswer("");
             setApplicationAnsweredMentally(false);
             setOutcome(undefined);
@@ -179,7 +290,56 @@ export function DailyRitual() {
         onAnswerChange={setAnswer}
         onAnsweredMentallyChange={setAnsweredMentally}
         onBack={goBack}
-        onContinue={() => setStep("apply")}
+        progress={
+          selectedSkill.exploration?.length
+            ? `1 из ${selectedSkill.exploration.length + 2}`
+            : undefined
+        }
+        onContinue={() => {
+          if (selectedSkill.exploration?.length) {
+            setExplorationIndex(0);
+            setStep("explore");
+            return;
+          }
+          setStep("apply");
+        }}
+      />
+    );
+  }
+
+  if (step === "explore" && selectedSkill?.exploration?.[explorationIndex]) {
+    const question = selectedSkill.exploration[explorationIndex];
+    const questionCount = selectedSkill.exploration.length + 2;
+
+    return (
+      <ExplorationScreen
+        skill={selectedSkill}
+        question={question}
+        answer={explorationAnswers[explorationIndex] ?? ""}
+        answeredMentally={explorationAnsweredMentally[explorationIndex] ?? false}
+        progress={`${explorationIndex + 2} из ${questionCount}`}
+        onAnswerChange={(nextAnswer) => {
+          setExplorationAnswers((current) => {
+            const next = [...current];
+            next[explorationIndex] = nextAnswer;
+            return next;
+          });
+        }}
+        onAnsweredMentallyChange={(nextAnsweredMentally) => {
+          setExplorationAnsweredMentally((current) => {
+            const next = [...current];
+            next[explorationIndex] = nextAnsweredMentally;
+            return next;
+          });
+        }}
+        onBack={goBack}
+        onContinue={() => {
+          if (explorationIndex < selectedSkill.exploration!.length - 1) {
+            setExplorationIndex((current) => current + 1);
+            return;
+          }
+          setStep("apply");
+        }}
       />
     );
   }
@@ -194,6 +354,11 @@ export function DailyRitual() {
         onApplicationAnswerChange={setApplicationAnswer}
         onAnsweredMentallyChange={setApplicationAnsweredMentally}
         onBack={goBack}
+        progress={
+          selectedSkill.exploration?.length
+            ? `${selectedSkill.exploration.length + 2} из ${selectedSkill.exploration.length + 2}`
+            : undefined
+        }
         onContinue={() => setStep("reflect")}
       />
     );
@@ -202,8 +367,7 @@ export function DailyRitual() {
   if (step === "reflect" && selectedSkill) {
     return (
       <ReflectionScreen
-        answer={answer}
-        applicationAnswer={applicationAnswer}
+        items={reflectionItems}
         outcome={outcome}
         onOutcomeChange={setOutcome}
         onBack={goBack}
@@ -235,6 +399,113 @@ export function DailyRitual() {
       todaySkill={todayCompletedSkill}
       onStart={startRitual}
     />
+  );
+}
+
+function OnboardingIntroScreen({
+  onContinue,
+  onSkip,
+}: {
+  onContinue: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div className="ritual-screen-enter flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+      <section className="space-y-7 pt-8">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">Знакомство · 1 из 2</p>
+          <h1
+            className="max-w-sm text-4xl font-medium leading-tight tracking-tight outline-none"
+            data-ritual-heading
+            tabIndex={-1}
+          >
+            Короткая опора на сейчас
+          </h1>
+          <p className="max-w-sm text-base leading-relaxed text-muted-foreground">
+            За несколько минут можно заметить, что происходит, и выбрать, что делать дальше.
+          </p>
+        </div>
+
+        <ol className="divide-y divide-border border-y border-border" aria-label="Как проходит практика">
+          <li className="flex items-center gap-4 py-4">
+            <span
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-medium text-secondary-foreground"
+              aria-hidden="true"
+            >
+              1
+            </span>
+            <span className="text-base leading-snug">Назвать, что сейчас занимает мысли</span>
+          </li>
+          <li className="flex items-center gap-4 py-4">
+            <span
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-medium text-secondary-foreground"
+              aria-hidden="true"
+            >
+              2
+            </span>
+            <span className="text-base leading-snug">Выбрать свой безопасный следующий шаг</span>
+          </li>
+        </ol>
+
+        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+          Необязательно, чтобы после практики стало легче.
+        </p>
+      </section>
+
+      <div className="space-y-2">
+        <Button type="button" size="lg" className="h-12 w-full" onClick={onContinue}>
+          Продолжить
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="lg"
+          className="h-12 w-full text-muted-foreground"
+          onClick={onSkip}
+        >
+          Пропустить знакомство
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingControlScreen({
+  onBack,
+  onStart,
+}: {
+  onBack: () => void;
+  onStart: () => void;
+}) {
+  return (
+    <div className="ritual-screen-enter flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+      <div className="space-y-8">
+        <BackButton onClick={onBack} />
+
+        <section className="space-y-4">
+          <p className="text-sm text-muted-foreground">Знакомство · 2 из 2</p>
+          <h1
+            className="max-w-sm text-4xl font-medium leading-tight tracking-tight outline-none"
+            data-ritual-heading
+            tabIndex={-1}
+          >
+            В своём темпе
+          </h1>
+          <p className="max-w-sm text-base leading-relaxed text-muted-foreground">
+            Можно отвечать письменно или про себя. Личные ответы не сохраняются.
+          </p>
+        </section>
+
+        <div className="space-y-2 border-l-2 border-primary/35 pl-4 text-sm leading-relaxed text-muted-foreground">
+          <p>Практику можно остановить в любой момент.</p>
+          <p>Если становится заметно тяжелее, лучше остановиться.</p>
+        </div>
+      </div>
+
+      <Button type="button" size="lg" className="h-12 w-full" onClick={onStart}>
+        Начать первую практику
+      </Button>
+    </div>
   );
 }
 
@@ -303,7 +574,7 @@ function HomeScreen({
           Начать с паузы
         </Button>
         <p className="text-center text-sm leading-relaxed text-muted-foreground">
-          Около двух минут. Можно остановиться в любой момент.
+          Обычно 2–4 минуты. Можно остановиться в любой момент.
         </p>
       </section>
     </div>
@@ -391,7 +662,7 @@ function PracticeGuide({
           {skill.name}
         </h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Одна короткая практика. Здесь нет правильного ответа.
+          {skill.duration ?? "Около двух минут"}. Здесь нет правильного ответа.
         </p>
       </section>
 
@@ -430,6 +701,7 @@ function PracticeScreen({
   onAnswerChange,
   onAnsweredMentallyChange,
   onBack,
+  progress,
   onContinue,
 }: {
   skill: RitualSkill;
@@ -438,6 +710,7 @@ function PracticeScreen({
   onAnswerChange: (answer: string) => void;
   onAnsweredMentallyChange: (answered: boolean) => void;
   onBack: () => void;
+  progress?: string;
   onContinue: () => void;
 }) {
   const canContinue = Boolean(answer.trim() || answeredMentally);
@@ -450,7 +723,9 @@ function PracticeScreen({
     <form onSubmit={submit} className="ritual-screen-enter space-y-6 pb-8">
       <BackButton onClick={onBack} />
       <section className="space-y-3">
-        <p className="text-sm text-muted-foreground">{skill.name}</p>
+        <p className="text-sm text-muted-foreground">
+          {skill.name}{progress ? ` · ${progress}` : ""}
+        </p>
         <label
           htmlFor={skill.question.id}
           className="block text-3xl font-medium leading-tight tracking-tight outline-none"
@@ -490,7 +765,131 @@ function PracticeScreen({
       </label>
 
       <Button type="submit" size="lg" className="h-12 w-full" disabled={!canContinue}>
-        Я ответил. Что дальше?
+        {skill.question.confirmationLabel ?? "Я ответил. Что дальше?"}
+      </Button>
+    </form>
+  );
+}
+
+function ExplorationScreen({
+  skill,
+  question,
+  answer,
+  answeredMentally,
+  progress,
+  onAnswerChange,
+  onAnsweredMentallyChange,
+  onBack,
+  onContinue,
+}: {
+  skill: RitualSkill;
+  question: RitualQuestion;
+  answer: string;
+  answeredMentally: boolean;
+  progress: string;
+  onAnswerChange: (answer: string) => void;
+  onAnsweredMentallyChange: (answered: boolean) => void;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  const isChoiceQuestion = Boolean(question.options?.length);
+  const canContinue = Boolean(answer.trim() || (!isChoiceQuestion && answeredMentally));
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (canContinue) onContinue();
+  };
+
+  return (
+    <form onSubmit={submit} className="ritual-screen-enter space-y-6 pb-8">
+      <BackButton onClick={onBack} />
+
+      {isChoiceQuestion ? (
+        <fieldset className="space-y-5">
+          <legend className="sr-only">{question.label}</legend>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {skill.name} · {progress}
+            </p>
+            <h1
+              className="text-3xl font-medium leading-tight tracking-tight outline-none"
+              data-ritual-heading
+              tabIndex={-1}
+            >
+              {question.label}
+            </h1>
+            <p className="text-sm leading-relaxed text-muted-foreground">{question.guidance}</p>
+          </div>
+
+          <div className="list gap-2 bg-transparent" role="radiogroup">
+            {question.options?.map((option) => (
+              <label
+                key={option.id}
+                className="list-row min-h-14 cursor-pointer grid-cols-[1fr_auto] items-center rounded-box border border-border bg-base-200/55 px-4 py-3 transition-colors has-[input:checked]:border-primary has-[input:checked]:bg-secondary focus-within:ring-3 focus-within:ring-ring active:bg-secondary/80"
+              >
+                <span className="text-base leading-snug">{option.label}</span>
+                <input
+                  type="radio"
+                  name={question.id}
+                  value={option.id}
+                  className="radio radio-sm"
+                  checked={answer === option.id}
+                  onChange={() => onAnswerChange(option.id)}
+                />
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : (
+        <>
+          <section className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {skill.name} · {progress}
+            </p>
+            <label
+              htmlFor={question.id}
+              className="block text-3xl font-medium leading-tight tracking-tight outline-none"
+              data-ritual-heading
+              tabIndex={-1}
+            >
+              {question.label}
+            </label>
+            <p
+              id={`${question.id}-guidance`}
+              className="text-sm leading-relaxed text-muted-foreground"
+            >
+              {question.guidance}
+            </p>
+          </section>
+
+          <Textarea
+            id={question.id}
+            name={question.id}
+            value={answer}
+            onChange={(event) => onAnswerChange(event.target.value)}
+            placeholder={question.placeholder}
+            aria-describedby={`${question.id}-guidance ${question.id}-privacy`}
+            className="min-h-32 resize-none bg-base-200/55 px-4 py-3"
+          />
+
+          <p id={`${question.id}-privacy`} className="text-sm leading-relaxed text-muted-foreground">
+            Запиши одну-две фразы или ответь про себя. «Не знаю» тоже подходит. Личный текст не сохранится.
+          </p>
+
+          <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-box border border-border bg-secondary/45 px-4 py-3 text-sm font-medium focus-within:ring-3 focus-within:ring-ring">
+            <input
+              type="checkbox"
+              name={`${question.id}-answered-mentally`}
+              className="checkbox checkbox-sm"
+              checked={answeredMentally}
+              onChange={(event) => onAnsweredMentallyChange(event.target.checked)}
+            />
+            Я ответил про себя
+          </label>
+        </>
+      )}
+
+      <Button type="submit" size="lg" className="h-12 w-full" disabled={!canContinue}>
+        {question.confirmationLabel ?? "Я ответил. Дальше"}
       </Button>
     </form>
   );
@@ -504,6 +903,7 @@ function ApplicationScreen({
   onApplicationAnswerChange,
   onAnsweredMentallyChange,
   onBack,
+  progress,
   onContinue,
 }: {
   skill: RitualSkill;
@@ -513,6 +913,7 @@ function ApplicationScreen({
   onApplicationAnswerChange: (answer: string) => void;
   onAnsweredMentallyChange: (answered: boolean) => void;
   onBack: () => void;
+  progress?: string;
   onContinue: () => void;
 }) {
   const canContinue = Boolean(applicationAnswer.trim() || answeredMentally);
@@ -533,7 +934,9 @@ function ApplicationScreen({
       </section>
 
       <section className="space-y-3">
-        <p className="text-sm text-muted-foreground">Теперь — что с этим делать</p>
+        <p className="text-sm text-muted-foreground">
+          {progress ? `${skill.name} · ${progress}` : "Теперь — что с этим делать"}
+        </p>
         <label
           htmlFor={skill.application.id}
           className="block text-3xl font-medium leading-tight tracking-tight outline-none"
@@ -579,27 +982,27 @@ function ApplicationScreen({
       </label>
 
       <Button type="submit" size="lg" className="h-12 w-full" disabled={!canContinue}>
-        Увидеть оба ответа
+        {progress ? "Увидеть свои ответы" : "Увидеть оба ответа"}
       </Button>
     </form>
   );
 }
 
 function ReflectionScreen({
-  answer,
-  applicationAnswer,
+  items,
   outcome,
   onOutcomeChange,
   onBack,
   onContinue,
 }: {
-  answer: string;
-  applicationAnswer: string;
+  items: RitualReflectionItem[];
   outcome?: RitualOutcomeId;
   onOutcomeChange: (outcome: RitualOutcomeId) => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
+  const observationItems = items.slice(0, -1);
+  const applicationItem = items.at(-1);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (outcome) onContinue();
@@ -610,23 +1013,31 @@ function ReflectionScreen({
       <BackButton onClick={onBack} />
 
       <div className="space-y-4">
-        <section className="space-y-2 border-l-2 border-primary/35 pl-4">
-          <p className="text-sm text-muted-foreground">
-            {answer.trim() ? "Что ты заметил" : "Первый ответ был про себя"}
-          </p>
-          <p className="text-base font-medium leading-relaxed">
-            {answer.trim() || "Не нужно подбирать правильную фразу или записывать её для приложения."}
-          </p>
-        </section>
+        <div className="divide-y divide-border border-y border-border">
+          {observationItems.map((item, index) => (
+            <section key={`${item.label}-${index}`} className="space-y-1.5 py-4">
+              <p className="text-sm text-muted-foreground">{item.label}</p>
+              <p className="text-base font-medium leading-relaxed">
+                {item.value.trim() ||
+                  (item.answeredMentally
+                    ? "Ответ был про себя."
+                    : "Необязательно записывать ответ для приложения.")}
+              </p>
+            </section>
+          ))}
+        </div>
 
-        <section className="space-y-2 rounded-box bg-secondary/55 p-4">
-          <p className="text-sm text-muted-foreground">
-            {applicationAnswer.trim() ? "Что делать дальше" : "Следующий вариант выбран про себя"}
-          </p>
-          <p className="text-xl font-medium leading-relaxed">
-            {applicationAnswer.trim() || "Необязательно записывать его для приложения."}
-          </p>
-        </section>
+        {applicationItem && (
+          <section className="space-y-2 rounded-box bg-secondary/55 p-4">
+            <p className="text-sm text-muted-foreground">{applicationItem.label}</p>
+            <p className="text-xl font-medium leading-relaxed">
+              {applicationItem.value.trim() ||
+                (applicationItem.answeredMentally
+                  ? "Следующий вариант выбран про себя."
+                  : "Необязательно записывать его для приложения.")}
+            </p>
+          </section>
+        )}
       </div>
 
       <fieldset className="space-y-4">
@@ -758,6 +1169,10 @@ function BackButton({ onClick }: { onClick: () => void }) {
       Назад
     </Button>
   );
+}
+
+function getQuestionAnswer(question: RitualQuestion, answer: string) {
+  return question.options?.find((option) => option.id === answer)?.label ?? answer;
 }
 
 function getGreeting() {
