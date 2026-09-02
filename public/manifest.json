@@ -4,8 +4,8 @@
   "description": "Короткие тренировки навыков вокруг мыслей, которые хочется встретить бережнее.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F7FAF7",
-  "theme_color": "#2F7D68",
+  "background_color": "#0A0F24",
+  "theme_color": "#0A0F24",
   "icons": [
     {
       "src": "/icon-192.png",

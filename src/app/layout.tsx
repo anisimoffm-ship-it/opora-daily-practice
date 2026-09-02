@@ -26,11 +26,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  colorScheme: "light dark",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#2F7D68" },
-    { media: "(prefers-color-scheme: dark)", color: "#18211F" },
-  ],
+  colorScheme: "dark",
+  themeColor: "#0A0F24",
 };
 
 export default function RootLayout({
@@ -39,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" className={`${geist.variable} h-full antialiased`}>
+    <html lang="ru" data-theme="opora" className={`${geist.variable} h-full antialiased`}>
       <body className="min-h-full bg-background text-foreground">
         <AppShell>{children}</AppShell>
       </body>

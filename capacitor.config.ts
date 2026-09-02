@@ -6,28 +6,28 @@ const config: CapacitorConfig = {
   appId: "com.opora.mobile",
   appName: "Опора",
   webDir: "out",
-  backgroundColor: "#F7FAF7",
+  backgroundColor: "#0A0F24",
   loggingBehavior: "debug",
   zoomEnabled: false,
   plugins: {
     SystemBars: {
       insetsHandling: "css",
-      style: "DEFAULT",
+      style: "DARK",
       hidden: false,
       animation: "NONE",
     },
     LocalNotifications: {
       smallIcon: "ic_stat_opora",
-      iconColor: "#2F7D68",
+      iconColor: "#7AD6C9",
       presentationOptions: ["banner", "list", "sound"],
     },
   },
   ios: {
-    backgroundColor: "#F7FAF7",
+    backgroundColor: "#0A0F24",
     contentInset: "never",
   },
   android: {
-    backgroundColor: "#F7FAF7",
+    backgroundColor: "#0A0F24",
     allowMixedContent: false,
   },
 };

@@ -189,9 +189,13 @@ export function NotificationSettingsPageContent() {
             );
           })}
         </div>
-        <div className="rounded-lg bg-secondary/60 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Пример</p>
-          <p className="mt-2 text-sm font-medium">{activePreview.title}</p>
+        <div
+          className="rounded-lg bg-secondary/60 p-4"
+          aria-label="Предпросмотр напоминания"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <p className="text-sm font-medium">{activePreview.title}</p>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{activePreview.body}</p>
         </div>
         <Button type="button" variant="secondary" size="lg" className="w-full" onClick={sendPreview}>

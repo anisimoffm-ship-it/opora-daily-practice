@@ -13,7 +13,7 @@
     "mobile:open:ios": "cap open ios",
     "mobile:open:android": "cap open android",
     "mobile:doctor": "cap doctor",
-    "mobile:assets": "capacitor-assets generate --ios --android --iconBackgroundColor '#F7FAF7' --iconBackgroundColorDark '#18211F' --splashBackgroundColor '#F7FAF7' --splashBackgroundColorDark '#18211F'",
+    "mobile:assets": "capacitor-assets generate --ios --android --iconBackgroundColor '#0A0F24' --iconBackgroundColorDark '#0A0F24' --splashBackgroundColor '#0A0F24' --splashBackgroundColorDark '#0A0F24'",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

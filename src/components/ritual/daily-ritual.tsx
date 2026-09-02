@@ -48,7 +48,7 @@ interface RitualReflectionItem {
 }
 
 const RITUAL_OUTCOMES: Array<{ id: RitualOutcomeId; label: string }> = [
-  { id: "clearer", label: "Ситуация стала чуть яснее" },
+  { id: "clearer", label: "Стало чуть яснее" },
   { id: "space", label: "Появилось немного пространства" },
   { id: "next-step", label: "Понятнее, что делать дальше" },
   { id: "same", label: "Ничего не изменилось" },
@@ -67,6 +67,7 @@ export function DailyRitual() {
   const [applicationAnsweredMentally, setApplicationAnsweredMentally] = useState(false);
   const [outcome, setOutcome] = useState<RitualOutcomeId>();
   const [completions, setCompletions] = useState<RitualCompletion[]>([]);
+  const [checkInEntry, setCheckInEntry] = useState<"home" | "breathing">("home");
 
   const selectedSkill = useMemo(
     () => (selectedStateId ? getSkillForState(selectedStateId) : undefined),
@@ -155,6 +156,11 @@ export function DailyRitual() {
       return;
     }
 
+    if (step === "check-in") {
+      setStep(checkInEntry === "breathing" ? "settling" : "home");
+      return;
+    }
+
     if (step === "apply" && selectedSkill?.exploration?.length) {
       setExplorationIndex(selectedSkill.exploration.length - 1);
       setStep("explore");
@@ -164,7 +170,7 @@ export function DailyRitual() {
     setStep((current) => {
       if (current === "onboarding-control") return "onboarding-intro";
       if (current === "settling") return "home";
-      if (current === "check-in") return "settling";
+      if (current === "check-in") return "home";
       if (current === "guide") return "check-in";
       if (current === "practice") return "guide";
       if (current === "apply") return "practice";
@@ -172,7 +178,7 @@ export function DailyRitual() {
       if (current === "support") return "reflect";
       return "home";
     });
-  }, [explorationIndex, selectedSkill, step]);
+  }, [checkInEntry, explorationIndex, selectedSkill, step]);
 
   useEffect(() => {
     if (step === "home" || step === "loading") return;
@@ -207,6 +213,17 @@ export function DailyRitual() {
     setApplicationAnswer("");
     setApplicationAnsweredMentally(false);
     setOutcome(undefined);
+  };
+
+  const startWriting = () => {
+    startRitual();
+    setCheckInEntry("home");
+    setStep("check-in");
+  };
+
+  const startBreathing = () => {
+    startRitual();
+    setCheckInEntry("breathing");
     setStep("settling");
   };
 
@@ -217,7 +234,7 @@ export function DailyRitual() {
 
   const startFirstRitual = () => {
     completeOnboarding();
-    startRitual();
+    setStep("home");
   };
 
   const finishRitual = () => {
@@ -245,7 +262,13 @@ export function DailyRitual() {
   }
 
   if (step === "settling") {
-    return <PracticeSettling onComplete={() => setStep("check-in")} onCancel={() => setStep("home")} />;
+    return (
+      <PracticeSettling
+        onComplete={() => setStep("check-in")}
+        onSkip={() => setStep("check-in")}
+        onBack={() => setStep("home")}
+      />
+    );
   }
 
   if (step === "check-in") {
@@ -389,7 +412,16 @@ export function DailyRitual() {
   }
 
   if (step === "complete") {
-    return <CompleteScreen onClose={() => setStep("home")} />;
+    return (
+      <CompleteScreen
+        skill={selectedSkill}
+        answer={answer}
+        applicationAnswer={applicationAnswer}
+        answeredMentally={answeredMentally}
+        applicationAnsweredMentally={applicationAnsweredMentally}
+        onClose={() => setStep("home")}
+      />
+    );
   }
 
   return (
@@ -397,7 +429,8 @@ export function DailyRitual() {
       completedToday={completedToday}
       previousSkill={previousSkill}
       todaySkill={todayCompletedSkill}
-      onStart={startRitual}
+      onWrite={startWriting}
+      onBreathe={startBreathing}
     />
   );
 }
@@ -513,12 +546,14 @@ function HomeScreen({
   completedToday,
   previousSkill,
   todaySkill,
-  onStart,
+  onWrite,
+  onBreathe,
 }: {
   completedToday: boolean;
   previousSkill?: RitualSkill;
   todaySkill?: RitualSkill;
-  onStart: () => void;
+  onWrite: () => void;
+  onBreathe: () => void;
 }) {
   if (completedToday) {
     return (
@@ -539,7 +574,7 @@ function HomeScreen({
           </p>
         </section>
 
-        <Button type="button" variant="secondary" size="lg" className="h-12 w-full" onClick={onStart}>
+        <Button type="button" variant="secondary" size="lg" className="h-12 w-full" onClick={onWrite}>
           Повторить, если хочется
         </Button>
       </div>
@@ -550,13 +585,13 @@ function HomeScreen({
     <div className="flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
       <section className="space-y-6 pt-4">
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{getGreeting()}.</p>
+          <p className="text-sm text-muted-foreground">{getGreeting()}</p>
           <h1
             className="max-w-sm text-4xl font-medium leading-tight tracking-tight outline-none"
             data-ritual-heading
             tabIndex={-1}
           >
-            Что сейчас больше всего занимает твои мысли?
+            Что сейчас занимает тебя больше всего?
           </h1>
         </div>
 
@@ -570,11 +605,20 @@ function HomeScreen({
       </section>
 
       <section className="space-y-3">
-        <Button type="button" size="lg" className="h-12 w-full" onClick={onStart}>
-          Начать с паузы
+        <Button type="button" size="lg" className="h-12 w-full" onClick={onWrite}>
+          Написать об этом
+        </Button>
+        <Button
+          type="button"
+          variant="link"
+          size="lg"
+          className="mx-auto flex h-10 min-h-10 px-2 text-sm font-normal text-muted-foreground"
+          onClick={onBreathe}
+        >
+          Или сначала подыши немного
         </Button>
         <p className="text-center text-sm leading-relaxed text-muted-foreground">
-          Обычно 2–4 минуты. Можно остановиться в любой момент.
+          Около двух минут. Можно остановиться в любой момент.
         </p>
       </section>
     </div>
@@ -1136,7 +1180,27 @@ function SupportScreen({
   );
 }
 
-function CompleteScreen({ onClose }: { onClose: () => void }) {
+function CompleteScreen({
+  skill,
+  answer,
+  applicationAnswer,
+  answeredMentally,
+  applicationAnsweredMentally,
+  onClose,
+}: {
+  skill?: RitualSkill;
+  answer: string;
+  applicationAnswer: string;
+  answeredMentally: boolean;
+  applicationAnsweredMentally: boolean;
+  onClose: () => void;
+}) {
+  const isStartingPractice = skill?.id === "courage-step";
+  const concreteStep = (isStartingPractice ? answer : applicationAnswer).trim();
+  const stepWasNamedMentally = isStartingPractice
+    ? answeredMentally
+    : applicationAnsweredMentally;
+
   return (
     <div className="ritual-screen-enter flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
       <section className="space-y-5 pt-14">
@@ -1148,11 +1212,20 @@ function CompleteScreen({ onClose }: { onClose: () => void }) {
           data-ritual-heading
           tabIndex={-1}
         >
-          На сегодня достаточно.
+          {isStartingPractice
+            ? "Ты назвал(а) то, что мешало начать."
+            : "Ты назвал(а), что можно сделать дальше."}
         </h1>
-        <p className="max-w-xs text-base leading-relaxed text-muted-foreground">
-          Практика закончена. Больше ничего делать не нужно.
-        </p>
+        <div className="max-w-sm space-y-3 text-base leading-relaxed text-muted-foreground">
+          <p>Это уже шаг.</p>
+          <p className="break-words">
+            {concreteStep
+              ? `На сегодня — один маленький: «${concreteStep}».`
+              : stepWasNamedMentally
+                ? "На сегодня достаточно одного маленького шага, который ты назвал(а) про себя."
+                : "На сегодня достаточно одного маленького шага."}
+          </p>
+        </div>
       </section>
 
       <Button type="button" variant="secondary" size="lg" className="h-12 w-full" onClick={onClose}>

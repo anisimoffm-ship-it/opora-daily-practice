@@ -35,7 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="app-shell mx-auto flex w-full max-w-lg flex-col">
       <NativeNavigation />
       <NotificationScheduler />
-      <header className="app-header sticky top-0 z-20 mb-8 flex items-center justify-between gap-4 bg-background/95 pb-4 backdrop-blur">
+      <header className="app-header sticky top-0 z-20 mb-8 flex items-center justify-between gap-4 pb-4 backdrop-blur">
         <div className="flex min-w-0 items-center gap-1">
           {!isHome && !ritualActive && (
             <button
