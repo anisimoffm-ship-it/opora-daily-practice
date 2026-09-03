@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowLeft, Sprout } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Bell, Sprout } from "lucide-react";
 import { PracticeSettling } from "@/components/ritual/practice-settling";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -245,7 +246,7 @@ export function DailyRitual() {
   };
 
   if (step === "loading") {
-    return <div className="min-h-[calc(100dvh-9rem)]" aria-hidden="true" />;
+    return <div className="ritual-viewport" aria-hidden="true" />;
   }
 
   if (step === "onboarding-intro") {
@@ -443,7 +444,7 @@ function OnboardingIntroScreen({
   onSkip: () => void;
 }) {
   return (
-    <div className="ritual-screen-enter flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+    <div className="ritual-screen-enter ritual-viewport flex flex-col justify-between gap-12 pb-8">
       <section className="space-y-7 pt-8">
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">Знакомство · 1 из 2</p>
@@ -511,7 +512,7 @@ function OnboardingControlScreen({
   onStart: () => void;
 }) {
   return (
-    <div className="ritual-screen-enter flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+    <div className="ritual-screen-enter ritual-viewport flex flex-col justify-between gap-12 pb-8">
       <div className="space-y-8">
         <BackButton onClick={onBack} />
 
@@ -557,7 +558,7 @@ function HomeScreen({
 }) {
   if (completedToday) {
     return (
-      <div className="flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+      <div className="ritual-viewport flex flex-col justify-between gap-12 pb-8">
         <section className="space-y-5 pt-6">
           <p className="text-sm text-muted-foreground">Сегодня</p>
           <h1
@@ -574,15 +575,18 @@ function HomeScreen({
           </p>
         </section>
 
-        <Button type="button" variant="secondary" size="lg" className="h-12 w-full" onClick={onWrite}>
-          Повторить, если хочется
-        </Button>
+        <div className="space-y-2">
+          <Button type="button" variant="secondary" size="lg" className="h-12 w-full" onClick={onWrite}>
+            Повторить, если хочется
+          </Button>
+          <NotificationsLink />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+    <div className="ritual-viewport flex flex-col justify-between gap-12 pb-8">
       <section className="space-y-6 pt-4">
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">{getGreeting()}</p>
@@ -620,8 +624,21 @@ function HomeScreen({
         <p className="text-center text-sm leading-relaxed text-muted-foreground">
           Около двух минут. Можно остановиться в любой момент.
         </p>
+        <NotificationsLink />
       </section>
     </div>
+  );
+}
+
+function NotificationsLink() {
+  return (
+    <Link
+      href="/notifications/"
+      className="btn btn-ghost mx-auto flex h-12 min-h-12 w-fit gap-2 px-3 text-sm font-normal text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring active:translate-y-px"
+    >
+      <Bell className="size-4" aria-hidden="true" />
+      Напоминания
+    </Link>
   );
 }
 
@@ -1138,7 +1155,7 @@ function SupportScreen({
   const isHeavier = outcome === "heavier";
 
   return (
-    <div className="ritual-screen-enter flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-10 pb-8">
+    <div className="ritual-screen-enter ritual-viewport flex flex-col justify-between gap-10 pb-8">
       <div className="space-y-8">
         <BackButton onClick={onBack} />
         <section className="space-y-4">
@@ -1202,7 +1219,7 @@ function CompleteScreen({
     : applicationAnsweredMentally;
 
   return (
-    <div className="ritual-screen-enter flex min-h-[calc(100dvh-9rem)] flex-col justify-between gap-12 pb-8">
+    <div className="ritual-screen-enter ritual-viewport flex flex-col justify-between gap-12 pb-8">
       <section className="space-y-5 pt-14">
         <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden="true">
           <Sprout className="size-5" />

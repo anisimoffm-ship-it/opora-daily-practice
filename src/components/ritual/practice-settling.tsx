@@ -165,7 +165,7 @@ export function PracticeSettling({
   return (
     <section
       ref={stageRef}
-      className="settling-scene flex min-h-[calc(100dvh-9rem)] flex-col pb-8 text-center"
+      className="settling-scene ritual-viewport flex flex-col pb-8 text-center"
       aria-labelledby="settling-title"
       aria-describedby="settling-description"
     >

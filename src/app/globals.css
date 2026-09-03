@@ -144,18 +144,16 @@
 
 .app-shell {
   min-height: 100dvh;
+  padding-top: calc(1rem + var(--app-safe-area-top));
   padding-right: calc(1.25rem + var(--app-safe-area-right));
   padding-bottom: calc(2rem + var(--app-safe-area-bottom));
   padding-left: calc(1.25rem + var(--app-safe-area-left));
 }
 
-.app-header {
-  margin-right: calc(-1.25rem - var(--app-safe-area-right));
-  margin-left: calc(-1.25rem - var(--app-safe-area-left));
-  padding-top: calc(1rem + var(--app-safe-area-top));
-  padding-right: calc(1.25rem + var(--app-safe-area-right));
-  padding-left: calc(1.25rem + var(--app-safe-area-left));
-  background-color: color-mix(in srgb, var(--color-base-100) 72%, transparent);
+.ritual-viewport {
+  min-height: calc(
+    100dvh - 3rem - var(--app-safe-area-top) - var(--app-safe-area-bottom)
+  );
 }
 
 .btn.btn-primary {
@@ -186,13 +184,6 @@ select {
 
 @media (min-width: 640px) {
   .app-shell {
-    padding-right: calc(1.5rem + var(--app-safe-area-right));
-    padding-left: calc(1.5rem + var(--app-safe-area-left));
-  }
-
-  .app-header {
-    margin-right: calc(-1.5rem - var(--app-safe-area-right));
-    margin-left: calc(-1.5rem - var(--app-safe-area-left));
     padding-right: calc(1.5rem + var(--app-safe-area-right));
     padding-left: calc(1.5rem + var(--app-safe-area-left));
   }
